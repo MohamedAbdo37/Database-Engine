@@ -1,4 +1,5 @@
 import { IOException } from '../exceptions/io-exception.js';
+import { PageType } from './page-type.dto.js';
 
 interface PageSlot {
     offset: number;
@@ -6,7 +7,7 @@ interface PageSlot {
     isDeleted: boolean;
 }
 
-interface PageHeader {
+interface TablePageHeader {
     freeSpace: number; // 4KB
     itemsCount: number;
     nextPageId: number;
@@ -37,8 +38,75 @@ export abstract class Page {
     public abstract deserialize(buffer: Buffer): Page;
 }
 
+export class DirectoryPage extends Page {
+    private _tableName: string;
+    private _numberOfPages: number;
+    private _pageType: PageType;
+    private _currentPageFreeSpace: number;
+
+    constructor(tableName: string) {
+        super(0);
+        if (tableName.length * 2 > 1000) {
+            throw new IOException(
+                `Table name "${tableName}" exceeds the maximum allowed length of 500 characters.`,
+            );
+        }
+        this._tableName = tableName;
+        this._numberOfPages = 1;
+        this._pageType = PageType.DIRECTORY;
+        this._currentPageFreeSpace = 0;
+    }
+
+    public get tableName(): string {
+        return this._tableName;
+    }
+    public get numberOfPages(): number {
+        return this._numberOfPages;
+    }
+    public get pageType(): PageType {
+        return this._pageType;
+    }
+    public get currentPageFreeSpace(): number {
+        return this._currentPageFreeSpace;
+    }
+
+    public set tableName(value: string) {
+        this._tableName = value;
+    }
+    public set numberOfPages(value: number) {
+        this._numberOfPages = value;
+    }
+    public set currentPageFreeSpace(value: number) {
+        this._currentPageFreeSpace = value;
+    }
+
+    public serialize(): Buffer {
+        const buffer = Buffer.alloc(PAGE_SIZE);
+        buffer.writeUInt32LE(this._numberOfPages, 0);
+        buffer.writeUInt32LE(this._pageType, 4);
+        buffer.writeUInt32LE(this._currentPageFreeSpace, 8);
+        buffer.writeUInt32LE(this._tableName.length * 2, 12);
+        buffer.write(
+            this._tableName,
+            16,
+            this._tableName.length * 2,
+            'utf16le',
+        );
+
+        return buffer;
+    }
+
+    public deserialize(buffer: Buffer): DirectoryPage {
+        this._numberOfPages = buffer.readUInt32LE(100);
+        this._pageType = buffer.readUInt32LE(104);
+        this._currentPageFreeSpace = buffer.readUInt32LE(108);
+        this._tableName = buffer.toString('utf16le', 0, 100).replace(/\0/g, '');
+        return this;
+    }
+}
+
 export class TablePage extends Page {
-    private _header: PageHeader;
+    private _header: TablePageHeader;
 
     private _slots: PageSlot[];
 
@@ -126,7 +194,7 @@ export class TablePage extends Page {
         });
     }
 
-    public replaceTuple(slotIndex: number, tupleBuffer: Buffer): boolean {
+    public replaceTuple(slotIndex: number, tupleBuffer: Buffer): number {
         if (slotIndex >= this._slots.length) return this.addTuple(tupleBuffer);
 
         const tupleLength: number = tupleBuffer.length;
@@ -151,10 +219,10 @@ export class TablePage extends Page {
             isDeleted: false,
         };
 
-        return true;
+        return slotIndex;
     }
 
-    public addTuple(tupleBuffer: Buffer): boolean {
+    public addTuple(tupleBuffer: Buffer): number {
         const tupleLength = tupleBuffer.length;
 
         if (this._deletedSlots.length > 0) {
@@ -170,7 +238,7 @@ export class TablePage extends Page {
         const requiredSpace = tupleLength + SLOT_SIZE;
 
         if (this._header.freeSpace - currentSlotArrayEnd < requiredSpace) {
-            return false;
+            return -1;
         }
 
         const newTupleOffset = this._header.freeSpace - tupleLength;
@@ -185,7 +253,7 @@ export class TablePage extends Page {
         this._header.itemsCount++;
         this._header.freeSpace = newTupleOffset;
 
-        return true;
+        return this._slots.length - 1;
     }
 
     public getTuple(slotIndex: number): Buffer | null {
