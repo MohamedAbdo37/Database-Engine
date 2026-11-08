@@ -9,8 +9,9 @@ import {
     readSync,
     writeSync,
 } from 'fs';
-import { Page, PAGE_SIZE } from '../dto/page.dto.js';
+import { Page, PAGE_SIZE, TablePage } from '../dto/page.dto.js';
 import { Injectable } from '@nestjs/common';
+import { PageType } from '../page-manager/page-manager.js';
 
 const DATA_FOLDER = './src/data';
 
@@ -104,12 +105,12 @@ export class FileManager {
             throw new IOException('File is not open for writing.');
 
         const buffer = await page.serialize();
-        const offset = page.pageId * PAGE_SIZE;
+        const offset = page.getPageId() * PAGE_SIZE;
 
         writeSync(this.fileDescriptor, buffer, 0, PAGE_SIZE, offset);
     }
 
-    public async readPage(pageId: number): Promise<Page> {
+    public async readPage(pageId: number, type: PageType): Promise<Page> {
         if (this.fileDescriptor === null)
             throw new IOException('File is not open for reading.');
 
@@ -124,6 +125,10 @@ export class FileManager {
 
         readSync(this.fileDescriptor, buffer, 0, PAGE_SIZE, offset);
 
-        return Page.deserialize(buffer);
+        if (type === PageType.TABLE) {
+            return new TablePage(pageId).deserialize(buffer);
+        }
+
+        return new TablePage(pageId).deserialize(buffer);
     }
 }

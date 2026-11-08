@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import { Page } from '../dto/page.dto.js';
+import { Page, TablePage } from '../dto/page.dto.js';
 import { FileManager } from './file-manager.js';
 
 describe('FileManager', () => {
@@ -11,11 +11,11 @@ describe('FileManager', () => {
 
 describe('Page Class', () => {
     it('should be defined', () => {
-        expect(new Page(0)).toBeDefined();
+        expect(new TablePage(0)).toBeDefined();
     });
 
     it('should add a tuple correctly', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const tupleBuffer = Buffer.from('test data');
         const result = page.addTuple(tupleBuffer);
 
@@ -23,7 +23,8 @@ describe('Page Class', () => {
         expect(page.slots.length).toBe(1);
         expect(page.slots[0].length).toBe(tupleBuffer.length);
         expect(
-            page.data
+            page
+                .getData()
                 .subarray(
                     page.slots[0].offset,
                     page.slots[0].offset + tupleBuffer.length,
@@ -33,7 +34,7 @@ describe('Page Class', () => {
     });
 
     it('should get a tuple correctly', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const tupleBuffer = Buffer.from('test data');
         page.addTuple(tupleBuffer);
         const retrievedTuple = page.getTuple(0);
@@ -43,7 +44,7 @@ describe('Page Class', () => {
     });
 
     it('should delete a tuple correctly', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const tupleBuffer = Buffer.from('test data');
         page.addTuple(tupleBuffer);
         page.deleteTuple(0);
@@ -52,7 +53,7 @@ describe('Page Class', () => {
     });
 
     it('should return null for a non-existent tuple', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const retrievedTuple = page.getTuple(0);
 
         expect(retrievedTuple).toBeNull();
@@ -60,7 +61,7 @@ describe('Page Class', () => {
     });
 
     it('should return null for a deleted tuple', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const tupleBuffer = Buffer.from('test data');
         page.addTuple(tupleBuffer);
         page.deleteTuple(0);
@@ -71,7 +72,7 @@ describe('Page Class', () => {
     });
 
     it('should replace a tuple correctly', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const tupleBuffer1 = Buffer.from('test data 1');
         const tupleBuffer2 = Buffer.from('test data 2');
         page.addTuple(tupleBuffer1);
@@ -82,7 +83,8 @@ describe('Page Class', () => {
         expect(page.slots.length).toBe(1);
         expect(page.slots[0].length).toBe(tupleBuffer2.length);
         expect(
-            page.data
+            page
+                .getData()
                 .subarray(
                     page.slots[0].offset,
                     page.slots[0].offset + tupleBuffer2.length,
@@ -95,7 +97,7 @@ describe('Page Class', () => {
     });
 
     it('should add a new tuple if replacing a non-existent slot', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const tupleBuffer = Buffer.from('test data');
         const addTupleSpy = vi.spyOn(page, 'addTuple');
         const result = page.replaceTuple(0, tupleBuffer);
@@ -104,7 +106,8 @@ describe('Page Class', () => {
         expect(page.slots.length).toBe(1);
         expect(page.slots[0].length).toBe(tupleBuffer.length);
         expect(
-            page.data
+            page
+                .getData()
                 .subarray(
                     page.slots[0].offset,
                     page.slots[0].offset + tupleBuffer.length,
@@ -116,7 +119,7 @@ describe('Page Class', () => {
     });
 
     it('should replace a deleted tuple correctly when use addTuple', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const tupleBuffer1 = Buffer.from('test data 1');
         const tupleBuffer2 = Buffer.from('test data 2');
 
@@ -133,7 +136,8 @@ describe('Page Class', () => {
         expect(page.slots).toHaveLength(1);
         expect(page.slots[0].length).toBe(tupleBuffer2.length);
         expect(
-            page.data
+            page
+                .getData()
                 .subarray(
                     page.slots[0].offset,
                     page.slots[0].offset + tupleBuffer2.length,
@@ -145,15 +149,18 @@ describe('Page Class', () => {
     });
 
     it('should serialize and deserialize correctly', () => {
-        const page = new Page(1);
+        const page = new TablePage(1);
         const tupleBuffer = Buffer.from('test data');
         page.addTuple(tupleBuffer);
         const serialized = page.serialize();
-        const deserializedPage = Page.deserialize(serialized);
+
+        const deserializedPage = new TablePage(0).deserialize(serialized);
 
         expect(deserializedPage).toStrictEqual(page);
-        expect(deserializedPage.pageId).toBe(page.pageId);
-        expect(deserializedPage.slots.length).toBe(page.slots.length);
-        expect(deserializedPage.data.equals(page.data)).toBe(true);
+        expect(deserializedPage.getPageId()).toBe(page.getPageId());
+        expect((deserializedPage as TablePage).slots.length).toBe(
+            page.slots.length,
+        );
+        expect(deserializedPage.getData().equals(page.getData())).toBe(true);
     });
 });
