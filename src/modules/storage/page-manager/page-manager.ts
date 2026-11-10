@@ -34,6 +34,58 @@ export class PageManager {
     private DirectoryPages: Map<string, DirectoryPageCacheKey> = new Map();
     private TablePages: Map<TablePageCacheKey, TablePageCacheValue> = new Map();
 
+    private addToDirectoryPageCache(
+        tableName: string,
+        directory: DirectoryPage,
+    ): void {
+        if (this.DirectoryPages.size >= DIRECTORY_PAGE_CACHE_SIZE_LIMIT) {
+            let oldestKey: string | null = null;
+            let oldestAccessTime = Infinity;
+            for (const [key, value] of this.DirectoryPages.entries()) {
+                if (value.lastAccessed < oldestAccessTime) {
+                    oldestAccessTime = value.lastAccessed;
+                    oldestKey = key;
+                }
+            }
+
+            if (oldestKey) {
+                this.DirectoryPages.delete(oldestKey);
+            }
+        }
+
+        this.DirectoryPages.set(tableName, {
+            page: directory,
+            lastAccessed: Date.now(),
+        });
+    }
+
+    private addToTablePageCache(
+        tableName: string,
+        pageId: number,
+        page: TablePage,
+    ): void {
+        const cacheKey: TablePageCacheKey = { tableName, pageId };
+        if (this.TablePages.size >= TABLE_PAGE_CACHE_SIZE_LIMIT) {
+            let oldestKey: TablePageCacheKey | null = null;
+            let oldestAccessTime = Infinity;
+            for (const [key, value] of this.TablePages.entries()) {
+                if (value.lastAccessed < oldestAccessTime) {
+                    oldestAccessTime = value.lastAccessed;
+                    oldestKey = key;
+                }
+            }
+
+            if (oldestKey) {
+                this.TablePages.delete(oldestKey);
+            }
+        }
+
+        this.TablePages.set(cacheKey, {
+            page: page,
+            lastAccessed: Date.now(),
+        });
+    }
+
     private async getCurrentPage(tableName: string): Promise<TablePage> {
         const directory: DirectoryPage = await this.getDirectoryPage(tableName);
 
@@ -56,31 +108,12 @@ export class PageManager {
             this.fileManger.openTableFile(tableName);
         }
 
-        if (this.DirectoryPages.size >= DIRECTORY_PAGE_CACHE_SIZE_LIMIT) {
-            let oldestKey: string | null = null;
-            let oldestAccessTime = Infinity;
-
-            for (const [key, value] of this.DirectoryPages.entries()) {
-                if (value.lastAccessed < oldestAccessTime) {
-                    oldestAccessTime = value.lastAccessed;
-                    oldestKey = key;
-                }
-            }
-
-            if (oldestKey) {
-                this.DirectoryPages.delete(oldestKey);
-            }
-        }
-
         const directory: DirectoryPage = (await this.fileManger.readPage(
             0,
             PageType.DIRECTORY,
         )) as DirectoryPage;
 
-        this.DirectoryPages.set(tableName, {
-            page: directory,
-            lastAccessed: Date.now(),
-        });
+        this.addToDirectoryPageCache(tableName, directory);
 
         return directory;
     }
@@ -98,31 +131,12 @@ export class PageManager {
             this.fileManger.openTableFile(tableName);
         }
 
-        if (this.TablePages.size >= TABLE_PAGE_CACHE_SIZE_LIMIT) {
-            let oldestKey: TablePageCacheKey | null = null;
-            let oldestAccessTime = Infinity;
-
-            for (const [key, value] of this.TablePages.entries()) {
-                if (value.lastAccessed < oldestAccessTime) {
-                    oldestAccessTime = value.lastAccessed;
-                    oldestKey = key;
-                }
-            }
-
-            if (oldestKey) {
-                this.TablePages.delete(oldestKey);
-            }
-        }
-
         const page: TablePage = (await this.fileManger.readPage(
             pageId,
             PageType.TABLE,
         )) as TablePage;
 
-        this.TablePages.set(cacheKey, {
-            page: page,
-            lastAccessed: Date.now(),
-        });
+        this.addToTablePageCache(tableName, pageId, page);
 
         return page;
     }
@@ -150,6 +164,8 @@ export class PageManager {
         const newPage = new TablePage(newPageId);
         directory.numberOfPages += 1;
 
+        this.addToTablePageCache(tableName, newPageId, newPage);
+
         await Promise.all([
             this.fileManger.writePage(newPage),
             this.updateDirectoryPage(tableName, directory),
@@ -161,6 +177,8 @@ export class PageManager {
     public async createNewTable(schema: Catalog): Promise<void> {
         const directoryPage = new DirectoryPage(schema.tableName);
         await this.fileManger.createTableDateFile(schema.tableName);
+        this.addToDirectoryPageCache(schema.tableName, directoryPage);
+
         this.fileManger.openTableFile(schema.tableName);
         await Promise.all([
             this.fileManger.writePage(directoryPage),
