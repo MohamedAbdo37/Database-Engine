@@ -1,6 +1,6 @@
-import { mkdir, readFile, stat, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { IOException } from '../exceptions/io-exception.js';
-import { CatalogSchema, DBObjects } from '../dto/catalogSchema.dto.js';
+import { Catalog, CatalogIndex, DBObjects } from '../dto/catalog.dto.js';
 import {
     closeSync,
     existsSync,
@@ -9,9 +9,9 @@ import {
     readSync,
     writeSync,
 } from 'fs';
-import { Page, PAGE_SIZE, TablePage } from '../dto/page.dto.js';
+import { DirectoryPage, Page, PAGE_SIZE, TablePage } from '../dto/page.dto.js';
+import { PageType } from '../dto/page-type.dto.js';
 import { Injectable } from '@nestjs/common';
-import { PageType } from '../page-manager/page-manager.js';
 
 const DATA_FOLDER = './src/data';
 
@@ -23,8 +23,7 @@ export class FileManager {
         path: string,
         obj: DBObjects,
     ): Promise<void> {
-        const jsonData = JSON.stringify(obj, null, 2);
-        const bytes = new TextEncoder().encode(jsonData);
+        const bytes = obj.serialize();
         await writeFile(path, bytes).catch((error: IOException) => {
             throw new IOException(
                 `Failed to write object to file ${path}: ${error instanceof Error ? error.message : String(error)}`,
@@ -43,14 +42,7 @@ export class FileManager {
         }
     }
 
-    private async createCatalogSchemaFile(
-        schema: CatalogSchema,
-    ): Promise<void> {
-        const catalogFilePath = `./src/data/catalog/${schema.tableName}.dat`;
-        await this.saveObjectToFile(catalogFilePath, schema);
-    }
-
-    async initializeDataFolder(): Promise<void> {
+    public async initializeDataFolder(): Promise<void> {
         await this.createFolder(DATA_FOLDER);
         await Promise.all([
             this.createFolder(`${DATA_FOLDER}/catalog`),
@@ -59,41 +51,66 @@ export class FileManager {
         ]);
     }
 
-    public async createTableDateFiles(schema: CatalogSchema): Promise<void> {
-        const dataFilePath = `./src/data/table/${schema.tableName}.dat`;
-        if (existsSync(dataFilePath)) {
-            throw new IOException(`Data file ${dataFilePath} already exists.`);
-        }
-        await writeFile(dataFilePath, Buffer.alloc(0)).catch(
-            (error: IOException) => {
-                throw new IOException(
-                    `Failed to create data file ${dataFilePath}: ${error instanceof Error ? error.message : String(error)}`,
-                );
-            },
-        );
+    public isFileOpen(): boolean {
+        return this.fileDescriptor !== null;
+    }
 
-        this.createCatalogSchemaFile(schema).catch((error: IOException) => {
+    public async createTableDateFile(tableName: string): Promise<void> {
+        const dataFilePath = `./src/data/table/${tableName}.dat`;
+        if (!existsSync(dataFilePath)) {
+            await writeFile(dataFilePath, Buffer.alloc(0)).catch(
+                (error: IOException) => {
+                    throw new IOException(
+                        `Failed to create data file ${dataFilePath}: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                },
+            );
+        }
+    }
+
+    public async createIndexFile(
+        tableName: string,
+        index: CatalogIndex,
+    ): Promise<void> {
+        // TODO: Implement index file creation logic based on the schema
+        // For now, just create an empty index file for the table
+        const indexFilePath = `./src/data/index/${tableName}/${index.name}.idx`;
+        if (!existsSync(indexFilePath)) {
+            await writeFile(indexFilePath, Buffer.alloc(0)).catch(
+                (error: IOException) => {
+                    throw new IOException(
+                        `Failed to create index file ${indexFilePath}: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                },
+            );
+        }
+    }
+
+    public async writeCatalogSchemaFile(schema: Catalog): Promise<void> {
+        const catalogFilePath = `./src/data/catalog/${schema.tableName}.dat`;
+        await this.saveObjectToFile(catalogFilePath, schema);
+    }
+
+    public async readCatalogSchema(tableName: string): Promise<Catalog> {
+        const filePath = `./src/data/catalog/${tableName}.dat`;
+        const bytes = await readFile(filePath).catch((error: IOException) => {
             throw new IOException(
-                `Failed to create catalog schema file for table ${schema.tableName}: ${error instanceof Error ? error.message : String(error)}`,
+                `Failed to read catalog schema file ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
             );
         });
+        return Catalog.deserialize(bytes);
     }
 
-    async readCatalogSchema(filePath: string): Promise<CatalogSchema> {
-        const bytes = await readFile(filePath);
-        const jsonData = new TextDecoder().decode(bytes);
-        return JSON.parse(jsonData) as CatalogSchema;
-    }
-
-    public async openFile(filePath: string): Promise<void> {
+    public async openTableFile(tableName: string): Promise<void> {
+        const filePath = `./src/data/table/${tableName}.dat`;
         if (!existsSync(filePath)) {
-            writeFile(filePath, Buffer.alloc(0));
+            await writeFile(filePath, Buffer.alloc(0));
         }
 
         this.fileDescriptor = openSync(filePath, 'r+');
     }
 
-    public async closeFile(): Promise<void> {
+    public async closeTableFile(): Promise<void> {
         if (this.fileDescriptor !== null) {
             closeSync(this.fileDescriptor);
             this.fileDescriptor = null;
@@ -103,10 +120,9 @@ export class FileManager {
     public async writePage(page: Page): Promise<void> {
         if (this.fileDescriptor === null)
             throw new IOException('File is not open for writing.');
+        const buffer = page.serialize();
 
-        const buffer = await page.serialize();
         const offset = page.getPageId() * PAGE_SIZE;
-
         writeSync(this.fileDescriptor, buffer, 0, PAGE_SIZE, offset);
     }
 
@@ -116,7 +132,7 @@ export class FileManager {
 
         const offset = pageId * PAGE_SIZE;
         const stat = fstatSync(this.fileDescriptor);
-        if (offset >= stat.size) {
+        if (offset > stat.size) {
             throw new IOException(
                 `Page with ID ${pageId} does not exist in the file.`,
             );
@@ -125,10 +141,13 @@ export class FileManager {
 
         readSync(this.fileDescriptor, buffer, 0, PAGE_SIZE, offset);
 
-        if (type === PageType.TABLE) {
-            return new TablePage(pageId).deserialize(buffer);
+        switch (type) {
+            case PageType.DIRECTORY:
+                return new DirectoryPage('').deserialize(buffer);
+            case PageType.TABLE:
+                return new TablePage(pageId).deserialize(buffer);
+            default:
+                throw new IOException(`Unknown page type: ${type}`);
         }
-
-        return new TablePage(pageId).deserialize(buffer);
     }
 }
