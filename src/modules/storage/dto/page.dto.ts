@@ -1,4 +1,6 @@
 import { IOException } from '../exceptions/io-exception.js';
+import { CatalogColumn } from './catalog.dto.js';
+import { DatatypeEnum } from './datatype.dto.js';
 import { PageType } from './page-type.dto.js';
 
 interface PageSlot {
@@ -10,11 +12,9 @@ interface PageSlot {
 interface TablePageHeader {
     freeSpace: number; // 4KB
     itemsCount: number;
-    nextPageId: number;
-    prevPageId: number;
 }
 
-const HEADER_SIZE = 20;
+const HEADER_SIZE = 12;
 const SLOT_SIZE = 9; // 4 bytes for offset, 4 bytes for length, 1 byte for isDeleted
 export const PAGE_SIZE = 4096; // 4KB
 
@@ -42,19 +42,17 @@ export class DirectoryPage extends Page {
     private _tableName: string;
     private _numberOfPages: number;
     private _pageType: PageType;
-    private _currentPageFreeSpace: number;
 
     constructor(tableName: string) {
         super(0);
-        if (tableName.length * 2 > 1000) {
+        if (tableName.length * 2 > 200) {
             throw new IOException(
-                `Table name "${tableName}" exceeds the maximum allowed length of 500 characters.`,
+                `Table name "${tableName}" exceeds the maximum allowed length of 200 characters.`,
             );
         }
         this._tableName = tableName;
         this._numberOfPages = 1;
         this._pageType = PageType.DIRECTORY;
-        this._currentPageFreeSpace = 0;
     }
 
     public get tableName(): string {
@@ -66,9 +64,6 @@ export class DirectoryPage extends Page {
     public get pageType(): PageType {
         return this._pageType;
     }
-    public get currentPageFreeSpace(): number {
-        return this._currentPageFreeSpace;
-    }
 
     public set tableName(value: string) {
         this._tableName = value;
@@ -76,19 +71,15 @@ export class DirectoryPage extends Page {
     public set numberOfPages(value: number) {
         this._numberOfPages = value;
     }
-    public set currentPageFreeSpace(value: number) {
-        this._currentPageFreeSpace = value;
-    }
 
     public serialize(): Buffer {
         const buffer = Buffer.alloc(PAGE_SIZE);
         buffer.writeUInt32LE(this._numberOfPages, 0);
         buffer.writeUInt32LE(this._pageType, 4);
-        buffer.writeUInt32LE(this._currentPageFreeSpace, 8);
-        buffer.writeUInt32LE(this._tableName.length * 2, 12);
+        buffer.writeUInt32LE(this._tableName.length * 2, 8);
         buffer.write(
             this._tableName,
-            16,
+            12,
             this._tableName.length * 2,
             'utf16le',
         );
@@ -97,10 +88,13 @@ export class DirectoryPage extends Page {
     }
 
     public deserialize(buffer: Buffer): DirectoryPage {
-        this._numberOfPages = buffer.readUInt32LE(100);
-        this._pageType = buffer.readUInt32LE(104);
-        this._currentPageFreeSpace = buffer.readUInt32LE(108);
-        this._tableName = buffer.toString('utf16le', 0, 100).replace(/\0/g, '');
+        this._numberOfPages = buffer.readUInt32LE(0);
+        this._pageType = buffer.readUInt32LE(4);
+        const tableNameLength = buffer.readUInt32LE(8);
+        this._tableName = buffer
+            .toString('utf16le', 12, 2 * tableNameLength)
+            .replace(/\0/g, '');
+
         return this;
     }
 }
@@ -117,8 +111,6 @@ export class TablePage extends Page {
         this._header = {
             freeSpace: PAGE_SIZE,
             itemsCount: 0,
-            nextPageId: 0,
-            prevPageId: 0,
         };
         this._slots = [];
     }
@@ -133,8 +125,6 @@ export class TablePage extends Page {
         buffer.writeUInt32LE(this.pageId, 0);
         buffer.writeUInt32LE(this._header.freeSpace, 4);
         buffer.writeUInt32LE(this._header.itemsCount, 8);
-        buffer.writeUInt32LE(this._header.nextPageId, 12);
-        buffer.writeUInt32LE(this._header.prevPageId, 16);
 
         for (let i = 0; i < this._slots.length; i++) {
             const slot = this._slots[i];
@@ -160,8 +150,6 @@ export class TablePage extends Page {
         this._header = {
             freeSpace: buffer.readUInt32LE(4),
             itemsCount: buffer.readUInt32LE(8),
-            nextPageId: buffer.readUInt32LE(12),
-            prevPageId: buffer.readUInt32LE(16),
         };
 
         const slots: PageSlot[] = [];
@@ -264,5 +252,23 @@ export class TablePage extends Page {
         const tupleLength = this._slots[slotIndex].length;
 
         return this.data.subarray(tupleOffset, tupleOffset + tupleLength);
+    }
+
+    public getAllTuples(): Buffer[] {
+        const tuples: Buffer[] = [];
+        for (const slot of this._slots) {
+            if (slot.isDeleted) continue;
+
+            const tupleOffset = slot.offset;
+            const tupleLength = slot.length;
+            const tupleBuffer = this.data.subarray(
+                tupleOffset,
+                tupleOffset + tupleLength,
+            );
+
+            tuples.push(tupleBuffer);
+        }
+
+        return tuples;
     }
 }

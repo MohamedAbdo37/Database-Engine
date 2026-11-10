@@ -1,6 +1,269 @@
-export enum PageType {
-    DIRECTORY = 0,
-    TABLE = 1,
-    INDEX = 2,
+import { Injectable } from '@nestjs/common';
+import { DirectoryPage, TablePage } from '../dto/page.dto.js';
+import { FileManager } from '../file-manager/file-manager.js';
+import { Catalog } from '../dto/catalog.dto.js';
+import { PageType } from '../dto/page-type.dto.js';
+import { RID } from '../dto/rid.dto.js';
+import { DatatypeEnum } from '../dto/datatype.dto.js';
+import { table } from 'console';
+
+export { PageType } from '../dto/page-type.dto.js';
+
+type DirectoryPageCacheKey = {
+    page: DirectoryPage;
+    lastAccessed: number;
+};
+
+type TablePageCacheKey = {
+    tableName: string;
+    pageId: number;
+};
+
+type TablePageCacheValue = {
+    page: TablePage;
+    lastAccessed: number;
+};
+
+const DIRECTORY_PAGE_CACHE_SIZE_LIMIT = 5; // Limit the cache size to 10 entries
+const TABLE_PAGE_CACHE_SIZE_LIMIT = 5; // Limit the cache size to 10 entries
+
+@Injectable()
+export class PageManager {
+    constructor(private readonly fileManger: FileManager) {}
+
+    private DirectoryPages: Map<string, DirectoryPageCacheKey> = new Map();
+    private TablePages: Map<TablePageCacheKey, TablePageCacheValue> = new Map();
+
+    private async getCurrentPage(tableName: string): Promise<TablePage> {
+        const directory: DirectoryPage = await this.getDirectoryPage(tableName);
+
+        const currentPageId = directory.numberOfPages - 1;
+
+        const page: TablePage = (await this.getTablePage(
+            tableName,
+            currentPageId,
+        )) as TablePage;
+
+        return page;
+    }
+
+    private async getDirectoryPage(tableName: string): Promise<DirectoryPage> {
+        if (this.DirectoryPages.has(tableName)) {
+            return this.DirectoryPages.get(tableName)?.page as DirectoryPage;
+        }
+
+        if (!this.fileManger.isFileOpen()) {
+            this.fileManger.openTableFile(tableName);
+        }
+
+        if (this.DirectoryPages.size >= DIRECTORY_PAGE_CACHE_SIZE_LIMIT) {
+            let oldestKey: string | null = null;
+            let oldestAccessTime = Infinity;
+
+            for (const [key, value] of this.DirectoryPages.entries()) {
+                if (value.lastAccessed < oldestAccessTime) {
+                    oldestAccessTime = value.lastAccessed;
+                    oldestKey = key;
+                }
+            }
+
+            if (oldestKey) {
+                this.DirectoryPages.delete(oldestKey);
+            }
+        }
+
+        const directory: DirectoryPage = (await this.fileManger.readPage(
+            0,
+            PageType.DIRECTORY,
+        )) as DirectoryPage;
+
+        this.DirectoryPages.set(tableName, {
+            page: directory,
+            lastAccessed: Date.now(),
+        });
+
+        return directory;
+    }
+
+    private async getTablePage(
+        tableName: string,
+        pageId: number,
+    ): Promise<TablePage> {
+        const cacheKey: TablePageCacheKey = { tableName, pageId };
+        if (this.TablePages.has(cacheKey)) {
+            return this.TablePages.get(cacheKey)?.page as TablePage;
+        }
+
+        if (!this.fileManger.isFileOpen()) {
+            this.fileManger.openTableFile(tableName);
+        }
+
+        if (this.TablePages.size >= TABLE_PAGE_CACHE_SIZE_LIMIT) {
+            let oldestKey: TablePageCacheKey | null = null;
+            let oldestAccessTime = Infinity;
+
+            for (const [key, value] of this.TablePages.entries()) {
+                if (value.lastAccessed < oldestAccessTime) {
+                    oldestAccessTime = value.lastAccessed;
+                    oldestKey = key;
+                }
+            }
+
+            if (oldestKey) {
+                this.TablePages.delete(oldestKey);
+            }
+        }
+
+        const page: TablePage = (await this.fileManger.readPage(
+            pageId,
+            PageType.TABLE,
+        )) as TablePage;
+
+        this.TablePages.set(cacheKey, {
+            page: page,
+            lastAccessed: Date.now(),
+        });
+
+        return page;
+    }
+
+    private async updateDirectoryPage(
+        tableName: string,
+        directory: DirectoryPage,
+    ): Promise<void> {
+        await this.fileManger.writePage(directory);
+        this.DirectoryPages.set(tableName, {
+            page: directory,
+            lastAccessed: Date.now(),
+        });
+    }
+
+    private async createNewTablePage(
+        tableName: string,
+        directoryPage?: DirectoryPage,
+    ): Promise<TablePage> {
+        const directory: DirectoryPage =
+            directoryPage ??
+            ((await this.getDirectoryPage(tableName)) as DirectoryPage);
+
+        const newPageId = directory.numberOfPages;
+        const newPage = new TablePage(newPageId);
+        directory.numberOfPages += 1;
+
+        await Promise.all([
+            this.fileManger.writePage(newPage),
+            this.updateDirectoryPage(tableName, directory),
+        ]);
+
+        return newPage;
+    }
+
+    public async createNewTable(schema: Catalog): Promise<void> {
+        const directoryPage = new DirectoryPage(schema.tableName);
+        await this.fileManger.createTableDateFile(schema.tableName);
+        this.fileManger.openTableFile(schema.tableName);
+        await Promise.all([
+            this.fileManger.writePage(directoryPage),
+            this.createNewTablePage(schema.tableName, directoryPage),
+        ]);
+
+        await this.fileManger.closeTableFile();
+    }
+
+    public async addRecord(tableName: string, record: Buffer): Promise<RID> {
+        this.fileManger.openTableFile(tableName);
+        let currentPage: TablePage = await this.getCurrentPage(tableName);
+        let slotIndex = currentPage.addTuple(record);
+        if (slotIndex === -1) {
+            currentPage = await this.createNewTablePage(tableName);
+            slotIndex = currentPage.addTuple(record);
+        }
+        await this.fileManger.writePage(currentPage);
+
+        this.fileManger.closeTableFile();
+        const rid: RID = {
+            pageId: currentPage.getPageId(),
+            slotNumber: slotIndex,
+        };
+
+        return rid;
+    }
+
+    public async getRecord(
+        tableName: string,
+        rid: RID,
+    ): Promise<Buffer | null> {
+        this.fileManger.openTableFile(tableName);
+        let page: TablePage = (await this.getTablePage(
+            tableName,
+            rid.pageId,
+        )) as TablePage;
+        const record: Buffer | null = page.getTuple(rid.slotNumber);
+        this.fileManger.closeTableFile();
+        return record;
+    }
+
+    public async deleteRecord(tableName: string, rid: RID): Promise<void> {
+        this.fileManger.openTableFile(tableName);
+        let page: TablePage = (await this.getTablePage(
+            tableName,
+            rid.pageId,
+        )) as TablePage;
+        page.deleteTuple(rid.slotNumber);
+        await this.fileManger.writePage(page);
+        this.fileManger.closeTableFile();
+    }
+
+    public async updateRecord(
+        tableName: string,
+        rid: RID,
+        updatedRecord: Buffer,
+    ): Promise<RID> {
+        this.fileManger.openTableFile(tableName);
+        let page: TablePage = (await this.getTablePage(
+            tableName,
+            rid.pageId,
+        )) as TablePage;
+
+        let slotIndex: number = page.replaceTuple(
+            rid.slotNumber,
+            updatedRecord,
+        );
+
+        if (slotIndex === -1) {
+            page = await this.createNewTablePage(tableName);
+            slotIndex = page.addTuple(updatedRecord);
+        }
+
+        await this.fileManger.writePage(page);
+        this.fileManger.closeTableFile();
+        const updatedRID: RID = {
+            pageId: page.getPageId(),
+            slotNumber: slotIndex,
+        };
+
+        return updatedRID;
+    }
+
+    public async getPageRecords(
+        tableName: string,
+        pageId: number,
+    ): Promise<Buffer[]> {
+        this.fileManger.openTableFile(tableName);
+        const directory: DirectoryPage = await this.getDirectoryPage(tableName);
+
+        if (pageId >= directory.numberOfPages) {
+            this.fileManger.closeTableFile();
+            return []; // Return an empty array if the pageId is out of bounds
+        }
+
+        const page: TablePage = (await this.getTablePage(
+            tableName,
+            pageId,
+        )) as TablePage;
+
+        this.fileManger.closeTableFile();
+
+        return page.getAllTuples();
+    }
 }
-export class PageManager {}
