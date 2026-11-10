@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
 import { IOException } from '../exceptions/io-exception.js';
 import { Catalog, CatalogIndex, DBObjects } from '../dto/catalog.dto.js';
 import {
@@ -68,6 +68,16 @@ export class FileManager {
         }
     }
 
+    public async deleteTableDataFile(tableName: string): Promise<void> {
+        const filePath = `./src/data/table/${tableName}.dat`;
+        try {
+            await unlink(filePath);
+            console.log(`Successfully deleted ${filePath}`);
+        } catch (error: any) {
+            console.error(`Error deleting file: ${error.message}`);
+        }
+    }
+
     public async createIndexFile(
         tableName: string,
         index: CatalogIndex,
@@ -99,6 +109,16 @@ export class FileManager {
             );
         });
         return Catalog.deserialize(bytes);
+    }
+
+    public async deleteCatalogSchemaFile(tableName: string): Promise<void> {
+        const filePath = `./src/data/catalog/${tableName}.dat`;
+        try {
+            await unlink(filePath);
+            console.log(`Successfully deleted ${filePath}`);
+        } catch (error: any) {
+            console.error(`Error deleting file: ${error.message}`);
+        }
     }
 
     public async openTableFile(tableName: string): Promise<void> {
