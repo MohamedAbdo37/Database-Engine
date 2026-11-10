@@ -197,6 +197,11 @@ export class PageManager {
         await this.fileManger.closeTableFile();
     }
 
+    public async deleteTable(tableName: string): Promise<void> {
+        this.fileManger.deleteTableDataFile(tableName);
+        this.DirectoryPages.delete(tableName);
+    }
+
     public async addRecord(tableName: string, record: Buffer): Promise<RID> {
         this.fileManger.openTableFile(tableName);
         let currentPage: TablePage = await this.getCurrentPage(tableName);
