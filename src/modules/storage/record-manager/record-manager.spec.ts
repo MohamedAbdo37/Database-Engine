@@ -3,6 +3,7 @@ import { PageManager } from '../page-manager/page-manager.js';
 import {
     BOOLEAN,
     CHAR,
+    Datatype,
     DATETIME,
     DOUBLE,
     INT,
@@ -10,26 +11,263 @@ import {
     TIMESTAMP,
     VARCHAR,
 } from '../dto/datatype.dto.js';
-import e from 'express';
-import { DatatypeException } from '../exceptions/datatype.exception.js';
+import { DatatypeException } from '../exceptions/data-input.exception.js';
+import { RID } from '../dto/rid.dto.js';
+import { NotFoundException } from '@nestjs/common';
 
 describe('RecordManager', () => {
     const pageManagerMock = {
         addRecord: vi.fn(),
-    } satisfies PageManager & { addRecord: () => void };
-    const createPageSpy = vi.spyOn(pageManagerMock, 'addRecord');
+        getRecord: vi.fn(),
+        deleteRecord: vi.fn(),
+        updateRecord: vi.fn(),
+        getPageRecords: vi.fn(),
+    } as unknown as PageManager & {
+        addRecord: () => Promise<RID>;
+        getRecord: () => Promise<Buffer | null>;
+        deleteRecord: () => Promise<void>;
+        updateRecord: () => Promise<RID>;
+        getPageRecords: () => Promise<Buffer[]>;
+    };
+
+    afterEach(() => {
+        vi.resetAllMocks();
+    });
 
     it('should be defined', () => {
         expect(new RecordManager(pageManagerMock)).toBeDefined();
     });
 
-    it('should spy on the page manager mock passed to it', () => {
-        const recordManager = new RecordManager(pageManagerMock);
+    it('should serialize and deserialize a record correctly', () => {
+        const record = [
+            new INT(42),
+            new VARCHAR('Hello', 10),
+            new BOOLEAN(true),
+            new DOUBLE(3.14),
+            new TIMESTAMP(new Date('2023-01-01T00:00:00Z')),
+            new DATETIME(new Date('2023-01-01T00:00:00Z')),
+            new CHAR('A', 1),
+            new SERIAL(123),
+        ];
 
-        pageManagerMock.addRecord();
+        const recordManager = new RecordManager(pageManagerMock);
+        const serialized = recordManager['serializeRecord'](record);
+        const deserialized = recordManager['deserializeRecord'](
+            serialized,
+            record,
+        );
+
+        expect(deserialized.length).toBe(record.length);
+    });
+
+    it('should spy on the page manager mock passed to it', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const createPageSpy = vi.spyOn(pageManagerMock, 'addRecord');
+        const tableName = 'test_table';
+
+        await recordManager.insertRecord(tableName, [
+            new INT(1),
+            new CHAR('A', 1),
+        ]);
+
+        const recordBuffer = Buffer.concat([
+            new INT(1).serialize(),
+            new CHAR('A', 1).serialize(),
+        ]);
 
         expect(recordManager).toBeDefined();
         expect(createPageSpy).toHaveBeenCalledOnce();
+        expect(createPageSpy).toHaveBeenCalledWith(tableName, recordBuffer);
+    });
+
+    it('should spy on the page manager mock passed to it for getRecord', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const getRecordSpy = vi.spyOn(pageManagerMock, 'getRecord');
+
+        const tableName = 'test_table';
+        const rid: RID = { pageId: 1, slotNumber: 0 };
+        await recordManager.retrieveRecord(tableName, rid, [
+            new INT(1),
+            new CHAR('A', 1),
+        ]);
+
+        expect(recordManager).toBeDefined();
+        expect(getRecordSpy).toHaveBeenCalledOnce();
+        expect(getRecordSpy).toHaveBeenCalledWith(tableName, rid);
+    });
+
+    it('should spy on the page manager mock passed to it for updateRecord', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+
+        const getRecordReturnValue = Buffer.concat([
+            new INT(1).serialize(),
+            new CHAR('A', 1).serialize(),
+        ]);
+
+        const getRecordSpy = vi
+            .spyOn(pageManagerMock, 'getRecord')
+            .mockResolvedValue(getRecordReturnValue);
+
+        const updateRecordSpy = vi.spyOn(pageManagerMock, 'updateRecord');
+
+        const tableName = 'test_table';
+        const rid: RID = { pageId: 1, slotNumber: 0 };
+        await recordManager.updateRecord(tableName, rid, [
+            new INT(2),
+            new CHAR('B', 1),
+        ]);
+
+        const updatedRecordBuffer = Buffer.concat([
+            new INT(2).serialize(),
+            new CHAR('B', 1).serialize(),
+        ]);
+
+        expect(recordManager).toBeDefined();
+        expect(getRecordSpy).toHaveBeenCalledOnce();
+        expect(getRecordSpy).toHaveBeenCalledWith(tableName, rid);
+
+        expect(updateRecordSpy).toHaveBeenCalledOnce();
+        expect(updateRecordSpy).toHaveBeenCalledAfter(getRecordSpy);
+        expect(updateRecordSpy).toHaveBeenCalledWith(
+            tableName,
+            rid,
+            updatedRecordBuffer,
+        );
+    });
+
+    it('should spy on the page manager mock passed to it for deleteRecord', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const deleteRecordSpy = vi.spyOn(pageManagerMock, 'deleteRecord');
+
+        const tableName = 'test_table';
+        const rid: RID = { pageId: 1, slotNumber: 0 };
+
+        await recordManager.deleteRecord(tableName, rid);
+
+        expect(recordManager).toBeDefined();
+        expect(deleteRecordSpy).toHaveBeenCalledOnce();
+        expect(deleteRecordSpy).toHaveBeenCalledWith(tableName, rid);
+    });
+
+    it('should spy on the page manager mock passed to it for scanRecords', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const firstPageRecords = [
+            Buffer.concat([
+                new INT(1).serialize(),
+                new CHAR('A', 1).serialize(),
+            ]),
+        ];
+
+        const secondPageRecords: Buffer[] = [];
+        const getPageRecordsSpy = vi
+            .spyOn(pageManagerMock, 'getPageRecords')
+            .mockResolvedValueOnce(firstPageRecords)
+            .mockResolvedValueOnce(secondPageRecords);
+
+        const tableName = 'test_table';
+
+        await recordManager.scanRecords(tableName, [
+            new INT(0),
+            new CHAR('', 1),
+        ]);
+
+        expect(recordManager).toBeDefined();
+
+        expect(
+            recordManager['pageStreamerGenerator'](1, tableName),
+        ).toBeDefined();
+
+        expect(getPageRecordsSpy).toHaveBeenCalledTimes(2);
+        expect(getPageRecordsSpy).toHaveBeenNthCalledWith(1, 'test_table', 1);
+        expect(getPageRecordsSpy).toHaveBeenNthCalledWith(2, 'test_table', 2);
+    });
+
+    it('should throw an error when trying to update a non-existent record', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const getRecordSpy = vi
+            .spyOn(pageManagerMock, 'getRecord')
+            .mockResolvedValue(null);
+
+        const tableName = 'test_table';
+        const rid: RID = { pageId: 1, slotNumber: 0 };
+
+        await expect(
+            recordManager.updateRecord(tableName, rid, [new INT(2)]),
+        ).rejects.toThrow(
+            new NotFoundException(
+                `Record with ID ${rid.pageId}-${rid.slotNumber} not found in table ${tableName}.`,
+            ),
+        );
+
+        expect(getRecordSpy).toHaveBeenCalledOnce();
+        expect(getRecordSpy).toHaveBeenCalledWith(tableName, rid);
+    });
+
+    it('should spy on the page manager mock passed to it for retrieveMultipleRecords and check if record deserialized correctly', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const firstRecord = Buffer.concat([
+            new INT(1).serialize(),
+            new CHAR('A', 1).serialize(),
+        ]);
+
+        const secondRecord = Buffer.concat([
+            new INT(2).serialize(),
+            new CHAR('B', 1).serialize(),
+        ]);
+
+        const thirdRecord = Buffer.concat([
+            new INT(100).serialize(),
+            new CHAR('C', 1).serialize(),
+        ]);
+
+        const getRecordSpy = vi
+            .spyOn(pageManagerMock, 'getRecord')
+            .mockResolvedValueOnce(firstRecord)
+            .mockResolvedValueOnce(secondRecord)
+            .mockResolvedValueOnce(thirdRecord);
+
+        const tableName = 'test_table';
+        const rids: RID[] = [
+            { pageId: 1, slotNumber: 2 },
+            { pageId: 2, slotNumber: 1 },
+            { pageId: 1, slotNumber: 0 },
+        ];
+
+        const records = await recordManager.retrieveMultipleRecords(
+            tableName,
+            rids,
+            [new INT(0), new CHAR('', 1)],
+        );
+
+        expect(recordManager).toBeDefined();
+        expect(getRecordSpy).toHaveBeenCalledTimes(3);
+        expect(getRecordSpy).toHaveBeenNthCalledWith(1, tableName, {
+            pageId: 1,
+            slotNumber: 0,
+        });
+        expect(getRecordSpy).toHaveBeenNthCalledWith(2, tableName, {
+            pageId: 1,
+            slotNumber: 2,
+        });
+        expect(getRecordSpy).toHaveBeenNthCalledWith(3, tableName, {
+            pageId: 2,
+            slotNumber: 1,
+        });
+
+        expect(records.length).toBe(3);
+        expect(records[0][0].value).toBe(1);
+        expect(records[0][1].value).toBe('A');
+        expect(records[1][0].value).toBe(2);
+        expect(records[1][1].value).toBe('B');
+        expect(records[2][0].value).toBe(100);
+        expect(records[2][1].value).toBe('C');
+
+        expect(records[0][0]).toBeInstanceOf(INT);
+        expect(records[0][1]).toBeInstanceOf(CHAR);
+        expect(records[1][0]).toBeInstanceOf(INT);
+        expect(records[1][1]).toBeInstanceOf(CHAR);
+        expect(records[2][0]).toBeInstanceOf(INT);
+        expect(records[2][1]).toBeInstanceOf(CHAR);
     });
 });
 
@@ -303,7 +541,9 @@ describe('DataType Serialization and Deserialization', () => {
         const serialized = datatype.serialize();
         const deserialized = new VARCHAR('', 20).deserialize(serialized);
 
+        expect(deserialized.size).toBe(
+            new TextEncoder().encode(varcharValue).length,
+        );
         expect(deserialized.value).toBe(varcharValue);
-        expect(deserialized.size).toBe(varcharValue.length * 2);
     });
 });

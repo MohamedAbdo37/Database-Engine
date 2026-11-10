@@ -1,14 +1,14 @@
-import { DatatypeException } from '../exceptions/datatype.exception.js';
+import { DatatypeException } from '../exceptions/data-input.exception.js';
 
 export enum DatatypeEnum {
-    SERIAL = 'SERIAL',
-    INT = 'INT',
-    DOUBLE = 'DOUBLE',
-    VARCHAR = 'VARCHAR',
-    BOOLEAN = 'BOOLEAN',
-    TIMESTAMP = 'TIMESTAMP',
-    DATETIME = 'DATETIME',
-    CHAR = 'CHAR',
+    SERIAL = 0,
+    INT = 1,
+    DOUBLE = 2,
+    VARCHAR = 3,
+    BOOLEAN = 4,
+    TIMESTAMP = 5,
+    DATETIME = 6,
+    CHAR = 7,
 }
 
 export abstract class Datatype<T> {
@@ -137,26 +137,49 @@ export class DOUBLE extends Datatype<number> {
 
 export class VARCHAR extends Datatype<string> {
     public serialize(): Buffer {
-        const buffer = Buffer.alloc(this.size);
-        buffer.write(this.value, 0, this.size, 'utf16le');
+        const buffer = Buffer.alloc(this.size + 2);
+        buffer.writeUInt16BE(this.size, 0);
+        buffer.write(this.value, 2, this.size, 'utf-8');
         return buffer;
     }
     public deserialize(buffer: Buffer): Datatype<string> {
+        this.size = buffer.readUInt16BE(0);
+        if (this.size > 4047) {
+            throw new DatatypeException(
+                `Size ${this.size} exceeds the maximum allowed size of 4047 bytes for VARCHAR type`,
+            );
+        }
+
         const value = buffer
-            .toString('utf16le', 0, buffer.length)
+            .toString('utf-8', 2, 2 + this.size)
             .replace(/\0/g, '');
         this.value = value;
-        this.size = value.length * 2;
         return this;
     }
 
     constructor(value: string, length: number) {
+        if (length <= 0) {
+            throw new Error(
+                `Length must be a positive integer greater than zero`,
+            );
+        }
+
+        if (length > 1018) {
+            throw new Error(
+                `Length exceeds the maximum allowed length of 1018 characters`,
+            );
+        }
+
         if (value.length > length) {
             throw new Error(
                 `Value length exceeds the specified length of ${length}`,
             );
         }
-        super(value, DatatypeEnum.VARCHAR, value.length * 2); // Assuming 2 bytes per character for UTF-16 encoding
+        super(
+            value,
+            DatatypeEnum.VARCHAR,
+            new TextEncoder().encode(value).length,
+        );
     }
 }
 
