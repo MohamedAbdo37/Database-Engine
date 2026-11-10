@@ -100,15 +100,20 @@ export class PageManager {
     }
 
     private async getDirectoryPage(tableName: string): Promise<DirectoryPage> {
+        let directory: DirectoryPage;
+
         if (this.DirectoryPages.has(tableName)) {
-            return this.DirectoryPages.get(tableName)?.page as DirectoryPage;
+            const DirectoryPageCacheValue = this.DirectoryPages.get(tableName);
+            directory = DirectoryPageCacheValue?.page as DirectoryPage;
+            DirectoryPageCacheValue!.lastAccessed = Date.now();
+            return directory;
         }
 
         if (!this.fileManger.isFileOpen()) {
             this.fileManger.openTableFile(tableName);
         }
 
-        const directory: DirectoryPage = (await this.fileManger.readPage(
+        directory = (await this.fileManger.readPage(
             0,
             PageType.DIRECTORY,
         )) as DirectoryPage;
@@ -123,15 +128,19 @@ export class PageManager {
         pageId: number,
     ): Promise<TablePage> {
         const cacheKey: TablePageCacheKey = { tableName, pageId };
+        let page: TablePage;
         if (this.TablePages.has(cacheKey)) {
-            return this.TablePages.get(cacheKey)?.page as TablePage;
+            const tablePageCacheValue = this.TablePages.get(cacheKey);
+            page = tablePageCacheValue?.page as TablePage;
+            tablePageCacheValue!.lastAccessed = Date.now();
+            return page;
         }
 
         if (!this.fileManger.isFileOpen()) {
             this.fileManger.openTableFile(tableName);
         }
 
-        const page: TablePage = (await this.fileManger.readPage(
+        page = (await this.fileManger.readPage(
             pageId,
             PageType.TABLE,
         )) as TablePage;
