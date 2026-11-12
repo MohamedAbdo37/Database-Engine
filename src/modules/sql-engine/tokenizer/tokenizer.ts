@@ -46,6 +46,7 @@ export class Tokenizer {
                 const matchingTokens = this.isMatchingToken(tokenText);
                 if (matchingTokens.length > 0) {
                     const matchedToken = matchingTokens[0];
+                    matchedToken.setPosition(idx + 1, curser + 1);
                     tokens.push(matchedToken);
                     curser += matchedToken.length;
                     continue;

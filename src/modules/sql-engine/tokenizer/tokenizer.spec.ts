@@ -242,6 +242,7 @@ describe('Tokenizer', () => {
         expect(tokens[18].value).toBe(';');
         expect(tokens[18].type).toBe('PUNCTUATION');
     });
+
     it('should throw an UnexpectedTokenException for an invalid DML SQL query', () => {
         const tokenizer = new Tokenizer();
         const sqlQuery =
@@ -250,5 +251,286 @@ describe('Tokenizer', () => {
         expect(() => tokenizer.tokenize(sqlQuery)).toThrow(
             'Unexpected token @ at position 1:40',
         );
+    });
+
+    it('should have NumberToken only for integer values', () => {
+        const tokenizer = new Tokenizer();
+        const text = '30';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('NUMBER');
+        expect(tokens[0].value).toBe('30');
+    });
+
+    it('should have NumberToken only for decimal values', () => {
+        const tokenizer = new Tokenizer();
+        const text = '30.5';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('NUMBER');
+        expect(tokens[0].value).toBe('30.5');
+    });
+
+    it('should have NumberToken only for decimal values with e', () => {
+        const tokenizer = new Tokenizer();
+        const text = '1.23e4';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('NUMBER');
+        expect(tokens[0].value).toBe('1.23e4');
+    });
+
+    it('should have LiteralToken only for string literals with double quotations', () => {
+        const tokenizer = new Tokenizer();
+        const text = '"John Doe"';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('LITERAL');
+        expect(tokens[0].value).toBe('"John Doe"');
+    });
+
+    it('should have LiteralToken only for string literals with single quotation', () => {
+        const tokenizer = new Tokenizer();
+        const text = "'John Doe'";
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('LITERAL');
+        expect(tokens[0].value).toBe("'John Doe'");
+    });
+
+    it('should have no matching token for an invalid string literal open and not closed', () => {
+        const tokenizer = new Tokenizer();
+        const text = '"John Doe';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have IdentifierToken for an invalid string literal closed and not opened', () => {
+        const tokenizer = new Tokenizer();
+        const text = 'John Doe"';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('IDENTIFIER');
+        expect(tokens[0].value).toBe('John');
+    });
+
+    it('should have no matching token for an invalid string literal with single quotation open and not closed', () => {
+        const tokenizer = new Tokenizer();
+        const text = "'John Doe";
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have IdentifierToken for an invalid string literal with single quotation closed and not opened', () => {
+        const tokenizer = new Tokenizer();
+        const text = "John Doe'";
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('IDENTIFIER');
+        expect(tokens[0].value).toBe('John');
+    });
+
+    it('should have no matching token for an invalid string literal with single quotation closed and double quotation opened', () => {
+        const tokenizer = new Tokenizer();
+        const text = '\'John Doe"';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have no matching token for an invalid string literal with double quotation closed and single quotation opened', () => {
+        const tokenizer = new Tokenizer();
+        const text = '"John Doe\'';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have 2 matching tokens for a keyword and an identifier', () => {
+        const tokenizer = new Tokenizer();
+        const text = 'CREATE TABLE';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(2);
+        expect(tokens[0].type).toBe('KEYWORD');
+        expect(tokens[0].value).toBe('CREATE');
+        expect(tokens[1].type).toBe('IDENTIFIER');
+        expect(tokens[1].value).toBe('CREATE');
+    });
+
+    it('should have IdentifierToken for a valid identifier with underscore', () => {
+        const tokenizer = new Tokenizer();
+        const text = 'my_table';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('IDENTIFIER');
+        expect(tokens[0].value).toBe('my_table');
+    });
+
+    it('should have IdentifierToken for a valid identifier ends numbers', () => {
+        const tokenizer = new Tokenizer();
+        const text = 'table1';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('IDENTIFIER');
+        expect(tokens[0].value).toBe('table1');
+    });
+
+    it('should have IdentifierToken for a valid identifier with numbers in th middle', () => {
+        const tokenizer = new Tokenizer();
+        const text = 'my1table';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('IDENTIFIER');
+        expect(tokens[0].value).toBe('my1table');
+    });
+
+    it('should have IdentifierToken for a valid identifier with numbers in the middle and underscore', () => {
+        const tokenizer = new Tokenizer();
+        const text = 'my1_table';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('IDENTIFIER');
+        expect(tokens[0].value).toBe('my1_table');
+    });
+
+    it('it should have no matching token for white space', () => {
+        const tokenizer = new Tokenizer();
+        const text = '   ';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have no matching token for single quotation', () => {
+        const tokenizer = new Tokenizer();
+        const text = "'";
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have no matching token for double quotation', () => {
+        const tokenizer = new Tokenizer();
+        const text = '"';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have no matching token for an empty string', () => {
+        const tokenizer = new Tokenizer();
+        const text = '';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have no matching token for a dot', () => {
+        const tokenizer = new Tokenizer();
+        const text = '.';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have identifier token for a valid identifier', () => {
+        const tokenizer = new Tokenizer();
+        const text = 'my_table';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('IDENTIFIER');
+        expect(tokens[0].value).toBe('my_table');
+    });
+
+    it('should have no matching token for an invalid identifier starting with a special character', () => {
+        const tokenizer = new Tokenizer();
+        const text = '!my_table';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have no for an invalid identifier starting with a number', () => {
+        const tokenizer = new Tokenizer();
+        const text = '1my_table';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should match numbers written in scientific notation', () => {
+        const tokenizer = new Tokenizer();
+        const tokens = tokenizer['isMatchingToken']('1.12e3');
+
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0].type).toBe('NUMBER');
+        expect(tokens[0].value).toBe('1.12e3');
+    });
+
+    it('should have PunctuationToken for a valid punctuation', () => {
+        const tokenizer = new Tokenizer();
+        const text = ',';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('PUNCTUATION');
+        expect(tokens[0].value).toBe(',');
+    });
+
+    it('should have no matching token for an invalid punctuation', () => {
+        const tokenizer = new Tokenizer();
+        const text = '@';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(0);
+    });
+
+    it('should have 2 matched for a valid double character operator', () => {
+        const tokenizer = new Tokenizer();
+        const text = '>=';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(2);
+        expect(tokens[0].type).toBe('MULTI_CHARACTER_OPERATOR');
+        expect(tokens[0].value).toBe('>=');
+        expect(tokens[1].type).toBe('SINGLE_CHARACTER_OPERATOR');
+        expect(tokens[1].value).toBe('>');
+    });
+
+    it('should have SingleCharacterOperatorToken for a valid single character operator', () => {
+        const tokenizer = new Tokenizer();
+        const text = '>';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('SINGLE_CHARACTER_OPERATOR');
+        expect(tokens[0].value).toBe('>');
+    });
+
+    it('should have 2 matched tokens for a valid datatype token', () => {
+        const tokenizer = new Tokenizer();
+        const text = 'INT';
+        const tokens = tokenizer['isMatchingToken'](text);
+
+        expect(tokens.length).toBe(2);
+        expect(tokens[0].type).toBe('DATATYPE');
+        expect(tokens[0].value).toBe('INT');
+        expect(tokens[1].type).toBe('IDENTIFIER');
+        expect(tokens[1].value).toBe('INT');
     });
 });
