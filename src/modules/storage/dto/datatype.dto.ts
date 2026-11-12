@@ -248,6 +248,11 @@ export class CHAR extends Datatype<string> {
     }
 
     constructor(value: string, length: number) {
+        if (length <= 0) {
+            throw new Error(
+                `Length must be a positive integer greater than zero`,
+            );
+        }
         if (value.length > length) {
             throw new Error(
                 `Value length exceeds the specified length of ${length}`,
