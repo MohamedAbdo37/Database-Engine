@@ -129,7 +129,7 @@ export class ColumnDefinition extends SubClassAST {
     }
 
     private setLength(datatype: string): void {
-        if (!expect(new PunctuationToken('('))) {
+        if (!this.expect(new PunctuationToken('('))) {
             const token = this.peek();
             throw new SyntaxErrorException(
                 `Expected '(' after ${datatype} datatype for column '${this.name}',` +
@@ -150,7 +150,7 @@ export class ColumnDefinition extends SubClassAST {
             );
         }
 
-        if (!expect(new PunctuationToken(')'))) {
+        if (!this.expect(new PunctuationToken(')'))) {
             const token = this.peek();
             throw new SyntaxErrorException(
                 `Expected ')' after ${datatype} datatype for column '${this.name}',` +

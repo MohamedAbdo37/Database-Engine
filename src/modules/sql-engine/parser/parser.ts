@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import {
     DATETIME,
     DOUBLE,
@@ -14,6 +15,7 @@ export interface Parser {
     parse(parserGenerator: ParserGenerator): AST | null;
 }
 
+@Injectable()
 export class ParserGenerator {
     private tokens: Token[] = [];
 

@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import { CatalogManager } from '../catalog-manager/catalog-manager.js';
 import { Catalog } from '../dto/catalog.dto.js';
 import { Datatype } from '../dto/datatype.dto.js';
@@ -7,6 +8,7 @@ import { PageManager } from '../page-manager/page-manager.js';
 import { RecordManager } from '../record-manager/record-manager.js';
 import { Table } from './table.dto.js';
 
+@Injectable()
 export class TableManager {
     constructor(
         private readonly pageManager: PageManager,
@@ -15,6 +17,14 @@ export class TableManager {
         private readonly recordManager: RecordManager,
     ) {}
 
+    public async isTableExists(tableName: string): Promise<boolean> {
+        try {
+            await this.catalogManager.getCatalog(tableName);
+            return true;
+        } catch {
+            return false;
+        }
+    }
     public async createTable(schema: Catalog): Promise<void> {
         await this.pageManager.createNewTable(schema);
         await this.indexManager.createIndexFile(
@@ -28,9 +38,7 @@ export class TableManager {
     }
 
     public async dropTable(tableName: string): Promise<void> {
-        await this.indexManager.deleteIndexFile(tableName);
-        await this.pageManager.deleteTable(tableName);
-        await this.catalogManager.deleteCatalog(tableName);
+        await this.catalogManager.dropTable(tableName);
     }
 
     public async getTableSchema(tableName: string): Promise<Catalog> {

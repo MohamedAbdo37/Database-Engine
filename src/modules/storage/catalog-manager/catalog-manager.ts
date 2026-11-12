@@ -58,7 +58,9 @@ export class CatalogManager {
         this.addToCache(schema.tableName, schema);
     }
 
-    public async deleteCatalog(tableName: string): Promise<void> {
+    public async dropTable(tableName: string): Promise<void> {
+        await this.fileManager.deleteTableDataFile(tableName);
+        await this.fileManager.deleteIndexFile(tableName);
         await this.fileManager.deleteCatalogSchemaFile(tableName);
         this.catalogCache.delete(tableName);
     }

@@ -1,5 +1,6 @@
 import { AST, DDLType } from '../ast.class.js';
-import { ColumnDefinition, DDL } from './ddl.class.js';
+import { ColumnDefinition } from './column-definition.ast.js';
+import { DDL } from './ddl.class.js';
 
 export enum AlterActionEnum {
     ADD_COLUMN = 'ADD_COLUMN',

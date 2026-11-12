@@ -38,6 +38,33 @@ export class CreateTableAST extends DDL {
         }
         parser.consume();
 
+        if (parser.expect(new KeywordToken('IF'))) {
+            parser.consume();
+            if (!parser.expect(new KeywordToken('NOT'))) {
+                const token = parser.peek();
+                throw new SyntaxErrorException(
+                    `Expected 'NOT' after 'IF', ` +
+                        (token !== null
+                            ? `but found '${token?.value}' at ${token?.position}.`
+                            : 'but found end of input.'),
+                );
+            }
+            parser.consume();
+
+            if (!parser.expect(new KeywordToken('EXISTS'))) {
+                const token = parser.peek();
+                throw new SyntaxErrorException(
+                    `Expected 'EXISTS' after 'IF NOT', ` +
+                        (token !== null
+                            ? `but found '${token?.value}' at ${token?.position}.`
+                            : 'but found end of input.'),
+                );
+            }
+
+            parser.consume();
+            this.ifNotExists = true;
+        } else this.ifNotExists = false;
+
         const tableNameToken = parser.consume();
         if (tableNameToken === null || tableNameToken.type !== 'IDENTIFIER') {
             throw new SyntaxErrorException(
@@ -104,7 +131,7 @@ export class CreateTableAST extends DDL {
 
         parser.consume();
 
-        if (!parser.expect(new KeywordToken(';'))) {
+        if (!parser.expect(new PunctuationToken(';'))) {
             const token = parser.peek();
             throw new SyntaxErrorException(
                 `Expected ';' after CREATE TABLE statement, but found '${token?.value}' at ${token?.position}.`,

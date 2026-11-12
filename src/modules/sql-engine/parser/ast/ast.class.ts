@@ -1,3 +1,4 @@
+import { SyntaxErrorException } from '../../exceptions/syntax-error.exc.js';
 import { Parser, ParserGenerator } from '../parser.js';
 
 export enum DDLType {
@@ -15,6 +16,19 @@ export enum DMLType {
 
 export abstract class AST implements Parser {
     public abstract parse(parser: ParserGenerator): AST | null;
+
+    protected missedTokenError(
+        expectedToken: string,
+        foundToken: string | null,
+        foundTokenPosition: string | null,
+    ): never {
+        throw new SyntaxErrorException(
+            `Expected 'TABLE' after '${expectedToken}', ` +
+                (foundToken !== null
+                    ? `but found '${foundToken}' at ${foundTokenPosition}.`
+                    : 'but found end of input.'),
+        );
+    }
 }
 
 export abstract class MainClassAST extends AST {

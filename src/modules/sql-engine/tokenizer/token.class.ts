@@ -100,7 +100,7 @@ export class SingleCharacterOperatorToken extends Token {
 export class KeywordToken extends Token {
     constructor(value: string = '') {
         const regex = new RegExp(
-            `^(SELECT|FROM|WHERE|AND|OR|INSERT|INTO|VALUES|UPDATE|SET|DELETE|ALTER|CREATE|TABLE|ORDER|GROUP|BY|AS|LIMIT|OFFSET|PRIMARY|KEY|NOT|NULL|CHECK|TRUE|FALSE)\\b`,
+            `^(SELECT|FROM|WHERE|AND|OR|INSERT|INTO|VALUES|UPDATE|SET|DELETE|ALTER|CREATE|TABLE|ORDER|GROUP|BY|AS|LIMIT|OFFSET|PRIMARY|KEY|NOT|NULL|CHECK|TRUE|FALSE|IF|NOT|EXISTS)\\b`,
             'i',
         );
         super(TokenType.KEYWORD, regex);

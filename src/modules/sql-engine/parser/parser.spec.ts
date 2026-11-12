@@ -682,7 +682,7 @@ describe('CreateTableAST parse method', () => {
             new IdentifierToken('created_at'),
             new DatatypeToken('TIMESTAMP'),
             new PunctuationToken(')'),
-            new KeywordToken(';'),
+            new PunctuationToken(';'),
         ];
         const parserGenerator = new ParserGenerator(tokens);
         const createTableAST = new CreateTableAST();

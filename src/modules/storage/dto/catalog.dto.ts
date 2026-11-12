@@ -34,8 +34,13 @@ export class CatalogColumn {
         this.name = name;
         this.datatype = datatype;
         this.isPrimary = isPrimary;
-        this.isUnique = isUnique;
-        this.isNullable = isNullable;
+        if (!isPrimary) {
+            this.isUnique = isUnique;
+            this.isNullable = isNullable;
+        } else {
+            this.isUnique = true;
+            this.isNullable = false;
+        }
         this.value = value || -1;
     }
 
@@ -138,27 +143,18 @@ export class Catalog implements DBObjects {
 
     serialize(): Buffer {
         const tableNameLength = this.tableName.length;
-        const columnsnameLength = this.columns.reduce(
-            (acc, column) => acc + column.name.length,
-            0,
-        );
-        const indexesnameLength = this.indexes.reduce(
-            (acc, index) => acc + index.name.length,
-            0,
-        );
         const totalLength =
-            4 +
-            tableNameLength * 2 +
-            4 +
-            columnsnameLength * 2 +
-            this.columns.length * 13 +
-            4 +
-            indexesnameLength * 2 +
-            this.indexes.length +
-            this.indexes.reduce(
-                (acc, index) => acc + index.columnsID.length * 4,
+            12 +
+            this.columns.reduce(
+                (acc, column) => acc + 16 + column.name.length * 2,
                 0,
-            );
+            ) +
+            this.indexes.reduce(
+                (acc, index) =>
+                    acc + 5 + index.columnsID.length * 2 + index.name.length * 2,
+                0,
+            ) +
+            tableNameLength * 2;
 
         const buffer = Buffer.alloc(totalLength);
 
@@ -173,20 +169,19 @@ export class Catalog implements DBObjects {
         }
 
         for (const index of this.indexes) {
-            buffer.writeInt8(index.isUnique ? 1 : 0, offset);
-            buffer.writeUInt16BE(index.columnsID.length, offset + 1);
-            for (let i = 0; i < index.columnsID.length; i++) {
-                buffer.writeUInt16BE(index.columnsID[i], offset + 3 + i * 2);
-            }
             buffer.writeUInt16BE(index.name.length, offset);
+            buffer.writeInt8(index.isUnique ? 1 : 0, offset + 2);
+            buffer.writeUInt16BE(index.columnsID.length, offset + 3);
+            for (let i = 0; i < index.columnsID.length; i++) {
+                buffer.writeUInt16BE(index.columnsID[i], offset + 5 + i * 2);
+            }
             buffer.write(
                 index.name,
-                offset + 3 + 2 * index.columnsID.length,
+                offset + 5 + 2 * index.columnsID.length,
                 'utf16le',
             );
 
-            offset =
-                offset + 3 + 2 * (index.columnsID.length + index.name.length);
+            offset += 5 + 2 * (index.columnsID.length + index.name.length);
         }
 
         buffer.write(this.tableName, offset, 'utf16le');
@@ -210,27 +205,27 @@ export class Catalog implements DBObjects {
 
         let indexes: CatalogIndex[] = [];
         for (let i = 0; i < numberOfIndexes; i++) {
-            const isUnique = buffer.readInt8(offset) === 1;
-            const columnsIDLength = buffer.readUInt16BE(offset + 1);
+            const nameLength = buffer.readUInt16BE(offset);
+            const isUnique = buffer.readInt8(offset + 2) === 1;
+            const columnsIDLength = buffer.readUInt16BE(offset + 3);
             let columnsID: number[] = [];
             for (let j = 0; j < columnsIDLength; j++) {
-                columnsID.push(buffer.readUInt16BE(offset + 3 + j * 2));
+                columnsID.push(buffer.readUInt16BE(offset + 5 + j * 2));
             }
-            const nameLength = buffer.readUInt16BE(offset);
             const name = buffer.toString(
                 'utf16le',
-                offset + 3 + 2 * columnsIDLength,
-                offset + 3 + 2 * (columnsIDLength + nameLength),
+                offset + 5 + 2 * columnsIDLength,
+                offset + 5 + 2 * (columnsIDLength + nameLength),
             );
 
             indexes.push({ name, columnsID, isUnique });
-            offset = offset + 3 + 2 * (columnsIDLength + nameLength);
+            offset += 5 + 2 * (columnsIDLength + nameLength);
         }
 
         const tableName = buffer.toString(
             'utf16le',
             offset,
-            4 + tableNameLength * 2,
+            offset + tableNameLength * 2,
         );
 
         return new Catalog(tableName, columns, indexes);

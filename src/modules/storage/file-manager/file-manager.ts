@@ -1,4 +1,11 @@
-import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
+import {
+    mkdir,
+    readdir,
+    readFile,
+    rmdir,
+    unlink,
+    writeFile,
+} from 'fs/promises';
 import { IOException } from '../exceptions/io-exception.js';
 import { Catalog, CatalogIndex, DBObjects } from '../dto/catalog.dto.js';
 import {
@@ -70,6 +77,7 @@ export class FileManager {
 
     public async deleteTableDataFile(tableName: string): Promise<void> {
         const filePath = `./src/data/table/${tableName}.dat`;
+        if (!existsSync(filePath)) return;
         try {
             await unlink(filePath);
             console.log(`Successfully deleted ${filePath}`);
@@ -86,6 +94,7 @@ export class FileManager {
         // For now, just create an empty index file for the table
         const indexFilePath = `./src/data/index/${tableName}/${index.name}.idx`;
         if (!existsSync(indexFilePath)) {
+            await this.createFolder(`./src/data/index/${tableName}`);
             await writeFile(indexFilePath, Buffer.alloc(0)).catch(
                 (error: IOException) => {
                     throw new IOException(
@@ -96,6 +105,22 @@ export class FileManager {
         }
     }
 
+    public async deleteIndexFile(tableName: string): Promise<void> {
+        const indexFolderPath = `./src/data/index/${tableName}`;
+        if (!existsSync(indexFolderPath)) return;
+        try {
+            const files = await readdir(indexFolderPath);
+            for (const file of files) {
+                const filePath = `${indexFolderPath}/${file}`;
+                await unlink(filePath);
+            }
+            await rmdir(indexFolderPath);
+            console.log(`Successfully deleted index folder ${indexFolderPath}`);
+        } catch (error: any) {
+            console.error(`Error deleting index folder: ${error.message}`);
+        }
+    }
+
     public async writeCatalogSchemaFile(schema: Catalog): Promise<void> {
         const catalogFilePath = `./src/data/catalog/${schema.tableName}.dat`;
         await this.saveObjectToFile(catalogFilePath, schema);
@@ -103,6 +128,11 @@ export class FileManager {
 
     public async readCatalogSchema(tableName: string): Promise<Catalog> {
         const filePath = `./src/data/catalog/${tableName}.dat`;
+        if (!existsSync(filePath)) {
+            throw new IOException(
+                `Catalog schema file for table '${tableName}' does not exist.`,
+            );
+        }
         const bytes = await readFile(filePath).catch((error: IOException) => {
             throw new IOException(
                 `Failed to read catalog schema file ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
@@ -113,6 +143,7 @@ export class FileManager {
 
     public async deleteCatalogSchemaFile(tableName: string): Promise<void> {
         const filePath = `./src/data/catalog/${tableName}.dat`;
+        if (!existsSync(filePath)) return;
         try {
             await unlink(filePath);
             console.log(`Successfully deleted ${filePath}`);
@@ -124,7 +155,9 @@ export class FileManager {
     public async openTableFile(tableName: string): Promise<void> {
         const filePath = `./src/data/table/${tableName}.dat`;
         if (!existsSync(filePath)) {
-            await writeFile(filePath, Buffer.alloc(0));
+            throw new IOException(
+                `Data file for table '${tableName}' does not exist.`,
+            );
         }
 
         this.fileDescriptor = openSync(filePath, 'r+');
