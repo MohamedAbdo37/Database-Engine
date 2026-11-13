@@ -68,7 +68,10 @@ export class CreateTableAST extends DDL {
         const tableNameToken = parser.consume();
         if (tableNameToken === null || tableNameToken.type !== 'IDENTIFIER') {
             throw new SyntaxErrorException(
-                `Expected table name after 'CREATE TABLE', ` +
+                `Expected table name after ` +
+                    (this.ifNotExists
+                        ? `'CREATE TABLE IF NOT EXISTS', `
+                        : `'CREATE TABLE', `) +
                     (tableNameToken !== null
                         ? `but found '${tableNameToken.value}' at ${tableNameToken.position}.`
                         : 'but found end of input.'),

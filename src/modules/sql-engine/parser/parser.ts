@@ -10,6 +10,7 @@ import { SyntaxErrorException } from '../exceptions/syntax-error.exc.js';
 import { KeywordToken, Token } from '../tokenizer/token.class.js';
 import { AST } from './ast/ast.class.js';
 import { CreateTableAST } from './ast/ddl/create-table.ast.js';
+import { DropTableAST } from './ast/ddl/drop-table.ast.js';
 
 export interface Parser {
     parse(parserGenerator: ParserGenerator): AST | null;
@@ -54,6 +55,8 @@ export class ParserGenerator {
         switch (true) {
             case new KeywordToken('CREATE').equals(token):
                 return new CreateTableAST().parse(this);
+            case new KeywordToken('DROP').equals(token):
+                return new DropTableAST().parse(this);
             default:
                 throw new SyntaxErrorException(
                     `Unexpected token '${token.value}' at ${token.position}.`,

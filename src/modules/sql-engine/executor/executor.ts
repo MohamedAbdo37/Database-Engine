@@ -9,6 +9,7 @@ import { DDLType, MainClassAST } from '../parser/ast/ast.class.js';
 import { ColumnConstraintEnum } from '../parser/ast/ddl/column-definition.ast.js';
 import { CreateTableAST } from '../parser/ast/ddl/create-table.ast.js';
 import { ExecutionErrorException } from '../exceptions/execution-error.exc.js';
+import { DropTableAST } from '../parser/ast/ddl/drop-table.ast.js';
 
 @Injectable()
 export class Executor {
@@ -18,6 +19,12 @@ export class Executor {
         switch (ast.type) {
             case DDLType.CREATE_TABLE:
                 await this.executeCreateTable(ast as CreateTableAST);
+                break;
+            case DDLType.DROP_TABLE:
+                await this.executeDropTable(ast as DropTableAST);
+                break;
+            case DDLType.ALTER_TABLE:
+                // Implement alter table logic here
                 break;
             default:
                 throw new Error(`Unsupported AST type: ${ast.type}`);
@@ -29,9 +36,14 @@ export class Executor {
             ast.tableName,
         );
 
-        if (ast.ifNotExists && isTableExists) return;
-
         if (isTableExists) {
+            if (ast.ifNotExists) {
+                console.log(
+                    `Table '${ast.tableName}' already exists. Skipping creation as 'IF NOT EXISTS' clause is specified.`,
+                );
+                return;
+            }
+
             throw new ExecutionErrorException(
                 `Table '${ast.tableName}' already exists. Use 'IF NOT EXISTS' clause to avoid this error.`,
             );
@@ -74,5 +86,26 @@ export class Executor {
             catalogIndexes,
         );
         await this.tableManager.createTable(catalog);
+    }
+
+    private async executeDropTable(ast: DropTableAST): Promise<void> {
+        const isTableExists = await this.tableManager.isTableExists(
+            ast.tableName,
+        );
+
+        if (!isTableExists) {
+            if (ast.ifExists) {
+                console.log(
+                    `Table '${ast.tableName}' does not exist. Skipping drop as 'IF EXISTS' clause is specified.`,
+                );
+                return;
+            }
+
+            throw new ExecutionErrorException(
+                `Table '${ast.tableName}' does not exist. Use 'IF EXISTS' clause to avoid this error.`,
+            );
+        }
+
+        await this.tableManager.dropTable(ast.tableName);
     }
 }
