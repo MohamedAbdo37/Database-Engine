@@ -15,6 +15,7 @@ export abstract class Datatype<T> {
     private _value: T;
     private _type: DatatypeEnum;
     private _size: number;
+    private _isNull: boolean = false;
 
     constructor(value: T, type: DatatypeEnum, size: number) {
         this._value = value;
@@ -38,6 +39,14 @@ export abstract class Datatype<T> {
         this._size = size;
     }
 
+    public get isNull(): boolean {
+        return this._isNull;
+    }
+
+    public set isNull(value: boolean) {
+        this._isNull = value;
+    }
+
     public abstract serialize(): Buffer;
     public abstract deserialize(buffer: Buffer): Datatype<T>;
 
@@ -53,12 +62,17 @@ export abstract class Datatype<T> {
 export class SERIAL extends Datatype<number> {
     public serialize(): Buffer {
         const buffer = Buffer.alloc(this.size);
-        buffer.writeUInt32BE(this.value, 0);
+        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
+        if (!this.isNull) buffer.writeUInt32BE(this.value, 1);
         return buffer;
     }
     public deserialize(buffer: Buffer): Datatype<number> {
-        const value = buffer.readUInt32BE(0);
-        this.value = value;
+        const isNull = buffer.readUInt8(0) === 1;
+        this.isNull = isNull;
+        if (!isNull) {
+            const value = buffer.readUInt32BE(1);
+            this.value = value;
+        }
         return this;
     }
     constructor(value: number) {
@@ -67,19 +81,24 @@ export class SERIAL extends Datatype<number> {
                 'Value must be a non-negative integer for SERIAL type',
             );
         }
-        super(value, DatatypeEnum.SERIAL, 4);
+        super(value, DatatypeEnum.SERIAL, 5);
     }
 }
 
 export class INT extends Datatype<number> {
     public serialize(): Buffer {
         const buffer = Buffer.alloc(this.size);
-        buffer.writeInt32BE(this.value, 0);
+        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
+        if (!this.isNull) buffer.writeInt32BE(this.value, 1);
         return buffer;
     }
     public deserialize(buffer: Buffer): Datatype<number> {
-        const value = buffer.readInt32BE(0);
-        this.value = value;
+        const isNull = buffer.readUInt8(0) === 1;
+        this.isNull = isNull;
+        if (!isNull) {
+            const value = buffer.readInt32BE(1);
+            this.value = value;
+        }
         return this;
     }
     constructor(value: number) {
@@ -93,19 +112,27 @@ export class INT extends Datatype<number> {
                 `Value ${value} exceeds the maximum safe integer limit for INT type`,
             );
 
-        super(value, DatatypeEnum.INT, 4);
+        super(value, DatatypeEnum.INT, 5);
     }
 }
 
 export class DOUBLE extends Datatype<number> {
     public serialize(): Buffer {
         const buffer = Buffer.alloc(this.size);
-        buffer.writeDoubleBE(this.value, 0);
+        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
+        if (!this.isNull) {
+            buffer.writeDoubleBE(this.value, 1);
+        }
         return buffer;
     }
+
     public deserialize(buffer: Buffer): Datatype<number> {
-        const value = buffer.readDoubleBE(0);
-        this.value = value;
+        const isNull = buffer.readUInt8(0) === 1;
+        this.isNull = isNull;
+        if (!isNull) {
+            const value = buffer.readDoubleBE(1);
+            this.value = value;
+        }
         return this;
     }
 
@@ -119,7 +146,7 @@ export class DOUBLE extends Datatype<number> {
             throw new DatatypeException(
                 `Value ${value} exceeds the maximum safe value limit for DOUBLE type`,
             );
-        super(value, DatatypeEnum.DOUBLE, 8);
+        super(value, DatatypeEnum.DOUBLE, 9);
     }
 
     equals(other: Datatype<number>): boolean {
@@ -137,22 +164,25 @@ export class DOUBLE extends Datatype<number> {
 
 export class VARCHAR extends Datatype<string> {
     public serialize(): Buffer {
-        const buffer = Buffer.alloc(this.size + 2);
-        buffer.writeUInt16BE(this.size, 0);
-        buffer.write(this.value, 2, this.size, 'utf-8');
+        const buffer = Buffer.alloc(this.size);
+        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
+        if (this.isNull) return buffer;
+
+        buffer.writeUInt16BE(this.size, 1);
+        buffer.write(this.value, 3, this.size, 'utf-8');
         return buffer;
     }
     public deserialize(buffer: Buffer): Datatype<string> {
-        this.size = buffer.readUInt16BE(0);
+        this.isNull = buffer.readUInt8(0) === 1;
+        if (this.isNull) return this;
+        this.size = buffer.readUInt16BE(1);
         if (this.size > 4047) {
             throw new DatatypeException(
                 `Size ${this.size} exceeds the maximum allowed size of 4047 bytes for VARCHAR type`,
             );
         }
 
-        const value = buffer
-            .toString('utf-8', 2, 2 + this.size)
-            .replace(/\0/g, '');
+        const value = buffer.toString('utf-8', 3, this.size).replace(/\0/g, '');
         this.value = value;
         return this;
     }
@@ -178,7 +208,7 @@ export class VARCHAR extends Datatype<string> {
         super(
             value,
             DatatypeEnum.VARCHAR,
-            new TextEncoder().encode(value).length,
+            new TextEncoder().encode(value).length + 3,
         );
     }
 }
@@ -186,32 +216,42 @@ export class VARCHAR extends Datatype<string> {
 export class BOOLEAN extends Datatype<boolean> {
     public serialize(): Buffer {
         const buffer = Buffer.alloc(this.size);
-        buffer.writeUInt8(this.value ? 1 : 0, 0);
+        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
+        if (this.isNull) return buffer;
+        buffer.writeUInt8(this.value ? 1 : 0, 1);
         return buffer;
     }
     public deserialize(buffer: Buffer): Datatype<boolean> {
-        const value = buffer.readUInt8(0) === 1;
+        const isNull = buffer.readUInt8(0) === 1;
+        this.isNull = isNull;
+        if (isNull) return this;
+        const value = buffer.readUInt8(1) === 1;
         this.value = value;
         return this;
     }
     constructor(value: boolean) {
-        super(value, DatatypeEnum.BOOLEAN, 1);
+        super(value, DatatypeEnum.BOOLEAN, 2);
     }
 }
 
 export class TIMESTAMP extends Datatype<Date> {
     constructor(value: Date) {
-        super(value, DatatypeEnum.TIMESTAMP, 8);
+        super(value, DatatypeEnum.TIMESTAMP, 9);
     }
 
     public serialize(): Buffer {
         const buffer = Buffer.alloc(this.size);
-        buffer.writeBigInt64BE(BigInt(this.value.getTime()), 0);
+        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
+        if (this.isNull) return buffer;
+        buffer.writeBigInt64BE(BigInt(this.value.getTime()), 1);
         return buffer;
     }
 
     public deserialize(buffer: Buffer): Datatype<Date> {
-        const timestamp = buffer.readBigInt64BE(0);
+        const isNull = buffer.readUInt8(0) === 1;
+        this.isNull = isNull;
+        if (isNull) return this;
+        const timestamp = buffer.readBigInt64BE(1);
         this.value = new Date(Number(timestamp));
         return this;
     }
@@ -220,28 +260,38 @@ export class TIMESTAMP extends Datatype<Date> {
 export class DATETIME extends Datatype<Date> {
     public serialize(): Buffer {
         const buffer = Buffer.alloc(this.size);
-        buffer.writeBigInt64BE(BigInt(this.value.getTime()), 0);
+        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
+        if (this.isNull) return buffer;
+        buffer.writeBigInt64BE(BigInt(this.value.getTime()), 1);
         return buffer;
     }
     public deserialize(buffer: Buffer): Datatype<Date> {
-        const timestamp = buffer.readBigInt64BE(0);
+        const isNull = buffer.readUInt8(0) === 1;
+        this.isNull = isNull;
+        if (isNull) return this;
+        const timestamp = buffer.readBigInt64BE(1);
         this.value = new Date(Number(timestamp));
         return this;
     }
     constructor(value: Date) {
-        super(value, DatatypeEnum.DATETIME, 8);
+        super(value, DatatypeEnum.DATETIME, 9);
     }
 }
 
 export class CHAR extends Datatype<string> {
     public serialize(): Buffer {
         const buffer = Buffer.alloc(this.size);
-        buffer.write(this.value, 0, this.size, 'utf16le');
+        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
+        if (this.isNull) return buffer;
+        buffer.write(this.value, 1, this.size - 1, 'utf16le');
         return buffer;
     }
     public deserialize(buffer: Buffer): Datatype<string> {
+        const isNull = buffer.readUInt8(0) === 1;
+        this.isNull = isNull;
+        if (isNull) return this;
         const value = buffer
-            .toString('utf16le', 0, this.size)
+            .toString('utf16le', 1, this.size)
             .replace(/\0/g, '');
         this.value = value;
         return this;
@@ -258,6 +308,6 @@ export class CHAR extends Datatype<string> {
                 `Value length exceeds the specified length of ${length}`,
             );
         }
-        super(value, DatatypeEnum.CHAR, length * 2); // Assuming 2 bytes per character for UTF-16 encoding
+        super(value, DatatypeEnum.CHAR, length * 2 + 1); // Assuming 2 bytes per character for UTF-16 encoding
     }
 }

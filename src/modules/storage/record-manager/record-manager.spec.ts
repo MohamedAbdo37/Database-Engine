@@ -541,9 +541,130 @@ describe('DataType Serialization and Deserialization', () => {
         const serialized = datatype.serialize();
         const deserialized = new VARCHAR('', 20).deserialize(serialized);
 
-        expect(deserialized.size).toBe(
-            new TextEncoder().encode(varcharValue).length,
-        );
+        expect(deserialized.size).toBe(serialized.length);
         expect(deserialized.value).toBe(varcharValue);
+    });
+});
+
+describe('Null datatype serialization and deserialization', () => {
+    it('should serialize and deserialize a null SERIAL', () => {
+        const datatype = new SERIAL(123);
+        datatype.isNull = true;
+
+        const deserialized = new SERIAL(0).deserialize(datatype.serialize());
+
+        expect(deserialized.isNull).toBe(true);
+    });
+
+    it('should serialize and deserialize a null INT', () => {
+        const datatype = new INT(42);
+        datatype.isNull = true;
+
+        const deserialized = new INT(0).deserialize(datatype.serialize());
+
+        expect(deserialized.isNull).toBe(true);
+    });
+
+    it('should serialize and deserialize a null DOUBLE', () => {
+        const datatype = new DOUBLE(3.14);
+        datatype.isNull = true;
+
+        const deserialized = new DOUBLE(0).deserialize(datatype.serialize());
+
+        expect(deserialized.isNull).toBe(true);
+    });
+
+    it('should serialize and deserialize a null VARCHAR', () => {
+        const datatype = new VARCHAR('value', 20);
+        datatype.isNull = true;
+
+        const deserialized = new VARCHAR('', 20).deserialize(
+            datatype.serialize(),
+        );
+
+        expect(deserialized.isNull).toBe(true);
+    });
+
+    it('should serialize and deserialize a null BOOLEAN', () => {
+        const datatype = new BOOLEAN(true);
+        datatype.isNull = true;
+
+        const deserialized = new BOOLEAN(false).deserialize(
+            datatype.serialize(),
+        );
+
+        expect(deserialized.isNull).toBe(true);
+    });
+
+    it('should serialize and deserialize a null TIMESTAMP', () => {
+        const datatype = new TIMESTAMP(new Date());
+        datatype.isNull = true;
+
+        const deserialized = new TIMESTAMP(new Date(0)).deserialize(
+            datatype.serialize(),
+        );
+
+        expect(deserialized.isNull).toBe(true);
+    });
+
+    it('should serialize and deserialize a null DATETIME', () => {
+        const datatype = new DATETIME(new Date());
+        datatype.isNull = true;
+
+        const deserialized = new DATETIME(new Date(0)).deserialize(
+            datatype.serialize(),
+        );
+
+        expect(deserialized.isNull).toBe(true);
+    });
+
+    it('should serialize and deserialize a null CHAR', () => {
+        const datatype = new CHAR('value', 5);
+        datatype.isNull = true;
+
+        const deserialized = new CHAR('', 5).deserialize(datatype.serialize());
+
+        expect(deserialized.isNull).toBe(true);
+    });
+
+    it('should preserve null and non-null fields in a record', () => {
+        const record = [
+            new INT(42),
+            new VARCHAR('hidden', 20),
+            new BOOLEAN(true),
+            new DOUBLE(3.14),
+            new CHAR('hidden', 6),
+            new SERIAL(123),
+            new TIMESTAMP(new Date('2023-01-01T00:00:00Z')),
+            new DATETIME(new Date('2024-01-01T00:00:00Z')),
+        ];
+        record[1].isNull = true;
+        record[4].isNull = true;
+        record[6].isNull = true;
+
+        const recordManager = new RecordManager({} as PageManager);
+        const serialized = recordManager['serializeRecord'](record);
+        const deserialized = recordManager['deserializeRecord'](
+            serialized,
+            record,
+        );
+
+        expect(deserialized.map((field) => field.isNull)).toEqual([
+            false,
+            true,
+            false,
+            false,
+            true,
+            false,
+            true,
+            false,
+        ]);
+        expect(deserialized[0].value).toBe(42);
+        expect(deserialized[2].value).toBe(true);
+        expect(deserialized[3].value).toBe(3.14);
+        expect(deserialized[5].value).toBe(123);
+        expect(deserialized[7].value).toEqual(
+            new Date('2024-01-01T00:00:00Z'),
+        );
     });
 });
