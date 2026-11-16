@@ -229,6 +229,12 @@ export class InsertAST extends DML {
             );
         }
         parser.consume();
+
+        if (this.peek() !== null) {
+            throw new SyntaxErrorException(
+                `Unexpected token '${this.peek()?.value}' after INSERT statement at ${this.peek()?.position}.`,
+            );
+        }
         return this;
     }
 }
