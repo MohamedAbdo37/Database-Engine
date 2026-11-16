@@ -11,6 +11,7 @@ import {
 import { ColumnDefinition } from './ast/ddl/column-definition.ast.js';
 import { CreateTableAST } from './ast/ddl/create-table.ast.js';
 import { ParserGenerator } from './parser.js';
+import { Tokenizer } from '../tokenizer/tokenizer.js';
 
 describe('ParserGenerator parse method', () => {
     it('should be defined', () => {
@@ -46,6 +47,65 @@ describe('ParserGenerator parse method', () => {
         expect(() => parserGenerator.parse()).toThrow(
             "Unexpected token 'Where' at undefined.",
         );
+    });
+});
+
+describe('ParserGenerator arithmetic expressions', () => {
+    const computeExpression = (expression: string): number => {
+        const parser = new ParserGenerator(
+            new Tokenizer().tokenize(expression),
+        );
+        const compute = Reflect.get(parser, 'cleanTokens') as () => void;
+        compute.call(parser);
+        return Number(parser.peek()?.value);
+    };
+
+    it('evaluates arithmetic expressions with precedence and parentheses', () => {
+        expect(computeExpression('2 + 3 * (4 + 1)')).toBe(17);
+    });
+
+    it('supports unary signs, exponentiation, and modulo', () => {
+        expect(computeExpression('-2 ^ 3 % 3')).toBe(-2);
+    });
+
+    it('rejects division by zero', () => {
+        const parser = new ParserGenerator(
+            new Tokenizer().tokenize('10 / (3 - 3)'),
+        );
+        const compute = Reflect.get(parser, 'cleanTokens') as () => void;
+
+        expect(() => compute.call(parser)).toThrow(
+            'Division by zero in numeric expression.',
+        );
+    });
+});
+
+describe('ParserGenerator boolean expressions', () => {
+    const cleanExpression = (expression: string): number => {
+        const parser = new ParserGenerator(
+            new Tokenizer().tokenize(expression),
+        );
+        const clean = Reflect.get(parser, 'cleanTokens') as () => void;
+        clean.call(parser);
+        return Number(parser.peek()?.value);
+    };
+
+    it('applies NOT, AND, and OR precedence correctly', () => {
+        expect(cleanExpression('NOT 2 < 3 OR 4 > 1 AND 6 = 6')).toBe(1);
+        expect(cleanExpression('NOT 2 < 3 AND 4 > 1')).toBe(0);
+    });
+
+    it('supports arithmetic operands in comparisons', () => {
+        expect(cleanExpression('2 + 3 * 4 = 14')).toBe(1);
+        expect(cleanExpression('10 % 3 = 1 AND 2 ^ 3 > 7')).toBe(1);
+        expect(cleanExpression('(2 + 3) * 4 = 20')).toBe(1);
+    });
+
+    it('supports inequality operators', () => {
+        expect(cleanExpression('2 <> 3')).toBe(1);
+        expect(cleanExpression('2 == 2')).toBe(1);
+        expect(cleanExpression('2 <= 2 AND 3 >= 2')).toBe(1);
+        expect(cleanExpression('(2 < 3) AND (4 > 1)')).toBe(1);
     });
 });
 
@@ -727,6 +787,36 @@ describe('CreateTableAST parse method', () => {
 
         expect(() => createTableAST.parse(parserGenerator)).toThrow(
             "Expected ')' after column definitions for table 'my_table', but found end of input.",
+        );
+    });
+
+    it('should throw an error for the tokens that after the simicolon', () => {
+        const tokens = [
+            new KeywordToken('CREATE'),
+            new KeywordToken('TABLE'),
+            new IdentifierToken('my_table'),
+            new PunctuationToken('('),
+            new IdentifierToken('id'),
+            new DatatypeToken('INT'),
+            new PunctuationToken(','),
+            new IdentifierToken('name'),
+            new DatatypeToken('VARCHAR'),
+            new PunctuationToken('('),
+            new NumberToken('255'),
+            new PunctuationToken(')'),
+            new PunctuationToken(','),
+            new IdentifierToken('created_at'),
+            new DatatypeToken('TIMESTAMP'),
+            new PunctuationToken(')'),
+            new PunctuationToken(';'),
+            new KeywordToken('WHERE'),
+        ];
+
+        const parserGenerator = new ParserGenerator(tokens);
+        const createTableAST = new CreateTableAST();
+
+        expect(() => createTableAST.parse(parserGenerator)).toThrow(
+            "Unexpected token 'WHERE' after CREATE TABLE statement at undefined.",
         );
     });
 });

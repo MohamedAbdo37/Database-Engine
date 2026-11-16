@@ -82,7 +82,7 @@ export class MultiCharacterOperatorToken extends Token {
 
 export class SingleCharacterOperatorToken extends Token {
     constructor(value: string = '') {
-        const regex = new RegExp(`^([+*/%<>=\\-])`);
+        const regex = new RegExp(`^([+*/%<>=\\-\\^])`);
         super(TokenType.SINGLE_CHARACTER_OPERATOR, regex);
         this.value = value;
     }
