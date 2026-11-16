@@ -1,4 +1,4 @@
-import { AST, DMLType, MainClassAST } from './ast.class.js';
+import { DMLType, MainClassAST } from '../ast.class.js';
 
 export abstract class DML extends MainClassAST {
     tableName: string;
