@@ -203,6 +203,39 @@ describe('RecordManager', () => {
         expect(getRecordSpy).toHaveBeenCalledWith(tableName, rid);
     });
 
+    it('should return null when retrieving a non-existent record', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const getRecordSpy = vi
+            .spyOn(pageManagerMock, 'getRecord')
+            .mockResolvedValue(null);
+        const tableName = 'test_table';
+        const rid: RID = { pageId: 1, slotNumber: 0 };
+
+        await expect(
+            recordManager.retrieveRecord(tableName, rid, [new INT(0)]),
+        ).resolves.toBeNull();
+
+        expect(getRecordSpy).toHaveBeenCalledWith(tableName, rid);
+    });
+
+    it('should throw when retrieving multiple records and one does not exist', async () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const rid: RID = { pageId: 1, slotNumber: 0 };
+        vi.spyOn(pageManagerMock, 'getRecord').mockResolvedValue(null);
+
+        await expect(
+            recordManager.retrieveMultipleRecords(
+                'test_table',
+                [rid],
+                [new INT(0)],
+            ),
+        ).rejects.toThrow(
+            new NotFoundException(
+                `Record with ID ${rid.pageId}-${rid.slotNumber} not found in table test_table.`,
+            ),
+        );
+    });
+
     it('should spy on the page manager mock passed to it for retrieveMultipleRecords and check if record deserialized correctly', async () => {
         const recordManager = new RecordManager(pageManagerMock);
         const firstRecord = Buffer.concat([
@@ -543,6 +576,41 @@ describe('DataType Serialization and Deserialization', () => {
 
         expect(deserialized.size).toBe(serialized.length);
         expect(deserialized.value).toBe(varcharValue);
+    });
+
+    it('should reject a VARCHAR with a non-positive length', () => {
+        expect(() => new VARCHAR('', 0)).toThrow(
+            'Length must be a positive integer greater than zero',
+        );
+    });
+
+    it('should reject a VARCHAR exceeding the maximum length', () => {
+        expect(() => new VARCHAR('', 1019)).toThrow(
+            'Length exceeds the maximum allowed length of 1018 characters',
+        );
+    });
+
+    it('should reject a VARCHAR value longer than its declared length', () => {
+        expect(() => new VARCHAR('Hello', 4)).toThrow(
+            'Value length exceeds the specified length of 4',
+        );
+    });
+
+    it('should reject a VARCHAR buffer with an invalid serialized size', () => {
+        const serialized = Buffer.alloc(4048);
+        serialized.writeUInt16BE(4048, 1);
+
+        expect(() => new VARCHAR('', 20).deserialize(serialized)).toThrow(
+            DatatypeException,
+        );
+    });
+
+    it('should reject a truncated serialized record', () => {
+        const recordManager = new RecordManager({} as PageManager);
+
+        expect(() =>
+            recordManager['deserializeRecord'](Buffer.alloc(1), [new INT(0)]),
+        ).toThrow(RangeError);
     });
 });
 
