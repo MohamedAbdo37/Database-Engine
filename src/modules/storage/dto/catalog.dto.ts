@@ -17,6 +17,7 @@ export interface DBObjects {
 
 export class CatalogColumn {
     name: string;
+    id: number;
     datatype: DatatypeEnum;
     isPrimary: boolean;
     isUnique: boolean;
@@ -25,6 +26,7 @@ export class CatalogColumn {
 
     constructor(
         name: string,
+        id: number,
         datatype: DatatypeEnum,
         isPrimary: boolean,
         isUnique: boolean,
@@ -32,6 +34,7 @@ export class CatalogColumn {
         value?: number,
     ) {
         this.name = name;
+        this.id = id;
         this.datatype = datatype;
         this.isPrimary = isPrimary;
         if (!isPrimary) {
@@ -76,15 +79,17 @@ export class CatalogColumn {
     }
 
     public serialize(): Buffer {
-        const buffer = Buffer.alloc(16 + this.name.length * 2);
+        const buffer = Buffer.alloc(18 + this.name.length * 2);
         let offset = 0;
-        buffer.writeInt16BE(this.datatype, offset);
-        buffer.writeInt8(this.isPrimary ? 1 : 0, offset + 2);
-        buffer.writeInt8(this.isUnique ? 1 : 0, offset + 5);
-        buffer.writeInt8(this.isNullable ? 1 : 0, offset + 9);
-        buffer.writeInt32BE(this.value, offset + 14);
+        buffer.writeInt16BE(this.datatype, 0);
+        buffer.writeInt8(this.isPrimary ? 1 : 0, 2);
+        buffer.writeInt8(this.isUnique ? 1 : 0, 3);
+        buffer.writeInt8(this.isNullable ? 1 : 0, 4);
+        buffer.writeInt32BE(this.value, 5);
+        buffer.writeUInt8(this.id, 9);
+        offset = 10;
         buffer.writeUInt16BE(this.name.length, offset);
-        buffer.write(this.name, offset + 16, 'utf16le');
+        buffer.write(this.name, offset + 2, 'utf16le');
 
         return buffer;
     }
@@ -92,14 +97,16 @@ export class CatalogColumn {
     public static deserialize(buffer: Buffer): CatalogColumn {
         const datatype = buffer.readInt16BE(0);
         const isPrimary = buffer.readInt8(2) === 1;
-        const isUnique = buffer.readInt8(5) === 1;
-        const isNullable = buffer.readInt8(9) === 1;
-        const value = buffer.readInt32BE(14);
-        const nameLength = buffer.readUInt16BE(0);
-        const name = buffer.toString('utf16le', 16, 16 + nameLength * 2);
+        const isUnique = buffer.readInt8(3) === 1;
+        const isNullable = buffer.readInt8(4) === 1;
+        const value = buffer.readInt32BE(5);
+        const id = buffer.readUInt8(9);
+        const nameLength = buffer.readUInt16BE(10);
+        const name = buffer.toString('utf16le', 12, 12 + nameLength * 2);
 
         return new CatalogColumn(
             name,
+            id,
             datatype,
             isPrimary,
             isUnique,
@@ -151,7 +158,10 @@ export class Catalog implements DBObjects {
             ) +
             this.indexes.reduce(
                 (acc, index) =>
-                    acc + 5 + index.columnsID.length * 2 + index.name.length * 2,
+                    acc +
+                    5 +
+                    index.columnsID.length * 2 +
+                    index.name.length * 2,
                 0,
             ) +
             tableNameLength * 2;

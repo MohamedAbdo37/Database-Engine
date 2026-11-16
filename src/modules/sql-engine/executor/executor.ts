@@ -50,11 +50,12 @@ export class Executor {
         }
 
         const catalogColumns: CatalogColumn[] = [];
-        for (const columnDef of ast.columns) {
+        for (const [id, columnDef] of ast.columns.entries()) {
             const columnValue =
                 columnDef.length !== undefined ? columnDef.length : -1;
             const catalogColumn: CatalogColumn = new CatalogColumn(
                 columnDef.name,
+                id,
                 columnDef.datatype,
                 columnDef.constraints.includes(
                     ColumnConstraintEnum.PRIMARY_KEY,
