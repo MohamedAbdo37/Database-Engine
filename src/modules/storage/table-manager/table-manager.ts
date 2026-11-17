@@ -6,7 +6,7 @@ import { RID } from '../dto/rid.dto.js';
 import { IndexManager } from '../index-manager/index-manager.js';
 import { PageManager } from '../page-manager/page-manager.js';
 import { RecordManager } from '../record-manager/record-manager.js';
-import { Column, Table } from './table.dto.js';
+import { Column, Row, Table } from './table.dto.js';
 import { WhereEvaluationException } from '../exceptions/where-evaluation.exce.js';
 
 export enum WhereOperator {
@@ -34,12 +34,7 @@ export class TableManager {
                     'The provided table has no columns. Cannot retrieve value by index.',
                 );
             }
-            if (column.data.length > 1) {
-                throw new WhereEvaluationException(
-                    'The provided table has more than one row. Only one row is expected.',
-                );
-            }
-            return column.getRowByIndex(index)?.data[0];
+            return column.getRowByIndex(index)?.data[0].value;
         }
         return column;
     }
@@ -49,6 +44,16 @@ export class TableManager {
         rightValue: any,
         operator: WhereOperator,
     ): boolean {
+        if (
+            leftValue !== null &&
+            rightValue !== null &&
+            typeof leftValue !== typeof rightValue
+        ) {
+            throw new WhereEvaluationException(
+                `Type mismatch: left operand is of type ${typeof leftValue}, while right operand is of type ${typeof rightValue}.`,
+            );
+        }
+
         switch (operator) {
             case WhereOperator.EQUALS:
                 return leftValue === rightValue;
@@ -116,19 +121,47 @@ export class TableManager {
     public async updateRecord(
         tableName: string,
         recordId: RID,
-        updatedRecord: Datatype<any>[],
+        schema: Datatype<any>[],
+        updatedRecord: any[],
     ): Promise<RID> {
-        const schema =
-            await this.catalogManager.getCatalogSchemaRecord(tableName);
         if (updatedRecord.length !== schema.length) {
             throw new Error(
                 `Updated record length (${updatedRecord.length}) does not match schema length (${schema.length})`,
             );
         }
+        const record: Datatype<any>[] = [];
+
+        for (let i = 0; i < updatedRecord.length; i++) {
+            const datatype = schema[i];
+            datatype.value = updatedRecord[i];
+            record.push(datatype);
+        }
+
         return await this.recordManager.updateRecord(
             tableName,
             recordId,
-            updatedRecord,
+            record,
+        );
+    }
+
+    public async updateRecords(
+        tableName: string,
+        schema: Datatype<any>[],
+        updatedRecords: Row[],
+    ): Promise<RID[]> {
+        if (updatedRecords.length === 0) {
+            return [];
+        }
+
+        if (updatedRecords[0].data.length !== schema.length) {
+            throw new Error(
+                `Record length (${updatedRecords[0].data.length}) does not match schema length (${schema.length})`,
+            );
+        }
+
+        return await this.recordManager.updateRecords(
+            tableName,
+            updatedRecords,
         );
     }
 

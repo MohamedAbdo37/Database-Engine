@@ -142,6 +142,22 @@ describe('Page Class', () => {
         expect(page.slots[0].isDeleted).toBe(false);
     });
 
+    it('should append a tuple when deleted slots are too small', () => {
+        const page = new TablePage(1);
+        const smallTuple = Buffer.from('small');
+        const largeTuple = Buffer.alloc(100);
+
+        page.addTuple(smallTuple);
+        page.deleteTuple(0);
+
+        const result = page.addTuple(largeTuple);
+
+        expect(result).toBe(1);
+        expect(page.slots[0].isDeleted).toBe(true);
+        expect(page.slots[1].length).toBe(largeTuple.length);
+        expect(page.getTuple(1)?.equals(largeTuple)).toBe(true);
+    });
+
     it('should serialize and deserialize correctly', () => {
         const page = new TablePage(1);
         const tupleBuffer = Buffer.from('test data');

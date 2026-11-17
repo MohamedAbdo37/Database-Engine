@@ -16,10 +16,20 @@ import {
     InsertRow,
 } from '../parser/ast/dml/insert.ast.js';
 import {
+    BOOLEAN,
+    CHAR,
     Datatype,
     DatatypeEnum,
+    DATETIME,
+    DOUBLE,
+    INT,
+    SERIAL,
+    TIMESTAMP,
     VARCHAR,
 } from '../../storage/dto/datatype.dto.js';
+import { UpdateAST } from '../parser/ast/dml/update.ast.js';
+import { Column, Row, Table } from '../../storage/table-manager/table.dto.js';
+import { RID } from '../../storage/dto/rid.dto.js';
 
 @Injectable()
 export class Executor {
@@ -38,6 +48,15 @@ export class Executor {
                 break;
             case DMLType.INSERT:
                 await this.executeInsert(ast as InsertAST);
+                break;
+            case DMLType.SELECT:
+                // Implement select logic here
+                break;
+            case DMLType.UPDATE:
+                await this.executeUpdate(ast as UpdateAST);
+                break;
+            case DMLType.DELETE:
+                // Implement delete logic here
                 break;
             default:
                 throw new Error(`Unsupported AST type: ${ast.type}`);
@@ -249,5 +268,136 @@ export class Executor {
         } else {
             record[column.id].isNull = true;
         }
+    }
+
+    private getDatatypeInstance(
+        datatype: DatatypeEnum,
+        size: number,
+        value?: any,
+        isNull?: boolean,
+    ): Datatype<any> {
+        switch (datatype) {
+            case DatatypeEnum.SERIAL:
+                return new SERIAL(value ?? 1, isNull);
+            case DatatypeEnum.INT:
+                return new INT(value ?? 0, isNull);
+            case DatatypeEnum.DOUBLE:
+                return new DOUBLE(value ?? 0, isNull);
+            case DatatypeEnum.VARCHAR:
+                return new VARCHAR(value ?? '', size, isNull);
+            case DatatypeEnum.BOOLEAN:
+                return new BOOLEAN(value ?? false, isNull);
+            case DatatypeEnum.TIMESTAMP:
+                return new TIMESTAMP(value ?? new Date(0), isNull);
+            case DatatypeEnum.DATETIME:
+                return new DATETIME(value ?? new Date(0), isNull);
+            case DatatypeEnum.CHAR:
+                return new CHAR(value ?? '', size, isNull);
+            default:
+                throw new Error(`Unsupported datatype: ${datatype}`);
+        }
+    }
+
+    private async executeUpdate(ast: UpdateAST): Promise<void> {
+        let rightOperandValue: any;
+        let leftOperandValue: any;
+
+        const schema = await this.tableManager.getTableSchema(ast.tableName);
+
+        if (ast.whereCondition.isRightOperandColumn) {
+            const schemaColumn = schema.columns.find(
+                (col) => col.name === ast.whereCondition.rightOperand,
+            );
+
+            if (!schemaColumn) {
+                throw new ExecutionErrorException(
+                    `Column '${ast.whereCondition.rightOperand}' does not exist in table '${ast.tableName}'.`,
+                );
+            }
+
+            const column: Column = {
+                name: schemaColumn.name,
+                datatype: this.getDatatypeInstance(
+                    schemaColumn?.datatype,
+                    schemaColumn.value,
+                ),
+                id: schemaColumn.id,
+                isPrimary: schemaColumn.isPrimary,
+            };
+
+            rightOperandValue = column;
+        } else rightOperandValue = ast.whereCondition.rightOperand;
+
+        if (ast.whereCondition.isLeftOperandColumn) {
+            const schemaColumn = schema.columns.find(
+                (col) => col.name === ast.whereCondition.leftOperand,
+            );
+
+            if (!schemaColumn) {
+                throw new ExecutionErrorException(
+                    `Column '${ast.whereCondition.leftOperand}' does not exist in table '${ast.tableName}'.`,
+                );
+            }
+
+            const column: Column = {
+                name: schemaColumn.name,
+                datatype: this.getDatatypeInstance(
+                    schemaColumn?.datatype,
+                    schemaColumn.value,
+                ),
+                id: schemaColumn.id,
+                isPrimary: schemaColumn.isPrimary,
+            };
+
+            leftOperandValue = column;
+        } else leftOperandValue = ast.whereCondition.leftOperand;
+
+        const table: Table = await this.tableManager.scanTable(ast.tableName);
+
+        const filteredTable: Table = this.tableManager.whereEvaluate(
+            table,
+            ast.whereCondition.operator,
+            rightOperandValue,
+            leftOperandValue,
+        );
+
+        for (const row of filteredTable.rows) {
+            for (const columnAssignment of ast.columns) {
+                const schemaColumn = schema.columns.find(
+                    (col) => col.name === columnAssignment.column,
+                );
+
+                if (!schemaColumn) {
+                    throw new ExecutionErrorException(
+                        `Column '${columnAssignment.column}' does not exist in table '${ast.tableName}'.`,
+                    );
+                }
+
+                if (columnAssignment.isNull && !schemaColumn.isNullable) {
+                    throw new ExecutionErrorException(
+                        `Column '${columnAssignment.column}' cannot be null in table '${ast.tableName}'.`,
+                    );
+                }
+
+                try {
+                    row.data[schemaColumn.id] = this.getDatatypeInstance(
+                        schemaColumn.datatype,
+                        schemaColumn.value,
+                        columnAssignment.value,
+                        columnAssignment.isNull,
+                    );
+                } catch (error: any) {
+                    throw new ExecutionErrorException(
+                        `Invalid value for column '${columnAssignment.column}': ${error.message}`,
+                    );
+                }
+            }
+        }
+
+        await this.tableManager.updateRecords(
+            ast.tableName,
+            await this.tableManager.getCatalogSchemaRecord(ast.tableName),
+            filteredTable.rows,
+        );
     }
 }

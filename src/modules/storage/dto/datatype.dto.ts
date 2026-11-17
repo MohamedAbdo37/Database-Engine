@@ -458,6 +458,7 @@ export class CHAR extends Datatype<string> {
         }
 
         this._value = val;
+        this.isNull = false;
     }
     public serialize(): Buffer {
         const buffer = Buffer.alloc(this.size);
@@ -478,15 +479,17 @@ export class CHAR extends Datatype<string> {
     }
 
     constructor(value: string, length: number, isNull: boolean = false) {
-        if (isNull) {
-            super('', DatatypeEnum.CHAR, 1);
-            this.isNull = true;
-            return;
-        }
         if (length <= 0) {
             throw new Error(
                 `Length must be a positive integer greater than zero`,
             );
+        }
+
+        if (isNull) {
+            super('', DatatypeEnum.CHAR, length * 2 + 1);
+            this.isNull = true;
+            this.length = length;
+            return;
         }
         if (value.length > length) {
             throw new Error(

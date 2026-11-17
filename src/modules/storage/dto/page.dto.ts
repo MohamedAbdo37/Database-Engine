@@ -218,7 +218,9 @@ export class TablePage extends Page {
                 (slot) => slot.size >= tupleLength,
             );
 
-            return this.replaceTuple(deletedSlot!.id, tupleBuffer);
+            if (deletedSlot) {
+                return this.replaceTuple(deletedSlot.id, tupleBuffer);
+            }
         }
 
         const currentSlotArrayEnd =

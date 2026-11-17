@@ -146,6 +146,40 @@ export class RecordManager {
         return rid;
     }
 
+    public async updateRecords(
+        tableName: string,
+        records: { rid: RID; data: Datatype<any>[] }[],
+    ): Promise<RID[]> {
+        const orderedRows = records.sort((a, b) => {
+            if (a.rid.pageId === b.rid.pageId) {
+                return a.rid.slotNumber - b.rid.slotNumber;
+            }
+            return a.rid.pageId - b.rid.pageId;
+        });
+
+        const updatedRecordIDs: RID[] = [];
+        const updatedRecordBuffers: Buffer[] = [];
+        for (const record of orderedRows) {
+            const buffer = await this.getRecordBuffer(tableName, record.rid);
+            if (buffer === null) {
+                throw new NotFoundException(
+                    `Record with ID ${record.rid.pageId}-${record.rid.slotNumber} not found in table ${tableName}.`,
+                );
+            }
+
+            updatedRecordIDs.push(record.rid);
+            updatedRecordBuffers.push(this.serializeRecord(record.data));
+        }
+
+        const rid: RID[] = await this.pageManger.updateRecords(
+            tableName,
+            updatedRecordIDs,
+            updatedRecordBuffers,
+        );
+
+        return rid;
+    }
+
     public async retrieveRecord(
         tableName: string,
         recordId: RID,
@@ -220,9 +254,9 @@ export class RecordManager {
                 records.push({
                     rid: {
                         pageId: page,
-                        slotNumber: records.length + 1,
+                        slotNumber: records.length,
                     },
-                    data: deserializedRecord.map((field) => field.value),
+                    data: deserializedRecord,
                 });
             }
             page++;

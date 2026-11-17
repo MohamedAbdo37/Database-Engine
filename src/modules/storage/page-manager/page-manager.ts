@@ -304,6 +304,58 @@ export class PageManager {
         return updatedRID;
     }
 
+    public async updateRecords(
+        tableName: string,
+        rids: RID[],
+        updatedRecords: Buffer[],
+    ): Promise<RID[]> {
+        if (rids.length !== updatedRecords.length) {
+            throw new Error(
+                `The number of RIDs (${rids.length}) does not match the number of updated records (${updatedRecords.length}).`,
+            );
+        }
+
+        const updatedRIDs: RID[] = [];
+
+        this.fileManger.openTableFile(tableName);
+        for (let i = 0; i < rids.length; i++) {
+            let page: TablePage = (await this.getTablePage(
+                tableName,
+                rids[i].pageId,
+            )) as TablePage;
+
+            let slotIndex: number = page.replaceTuple(
+                rids[i].slotNumber,
+                updatedRecords[i],
+            );
+
+            if (slotIndex === -1) {
+                let currentPage = await this.getCurrentPage(tableName);
+                slotIndex = currentPage.addTuple(updatedRecords[i]);
+                if (slotIndex === -1) {
+                    currentPage = await this.createNewTablePage(tableName);
+                    slotIndex = currentPage.addTuple(updatedRecords[i]);
+                }
+                page.deleteTuple(rids[i].slotNumber);
+                await this.fileManger.writePage(currentPage);
+                updatedRIDs.push({
+                    pageId: currentPage.getPageId(),
+                    slotNumber: slotIndex,
+                });
+                continue; // Skip the rest of the loop and move to the next record
+            }
+
+            await this.fileManger.writePage(page);
+
+            updatedRIDs.push({
+                pageId: page.getPageId(),
+                slotNumber: slotIndex,
+            });
+        }
+        this.fileManger.closeTableFile();
+        return updatedRIDs;
+    }
+
     public async getPageRecords(
         tableName: string,
         pageId: number,

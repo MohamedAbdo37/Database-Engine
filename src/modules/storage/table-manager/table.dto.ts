@@ -10,7 +10,7 @@ export interface Column {
 
 export interface Row {
     rid: RID;
-    data: any[];
+    data: Datatype<any>[];
 }
 
 export class Table {
@@ -24,12 +24,8 @@ export class Table {
         this._data = [];
     }
 
-    public get data(): Datatype<any>[][] {
-        const rows: Datatype<any>[][] = [];
-        for (const row of this._data) {
-            rows.push(row.data);
-        }
-        return rows;
+    public get rows(): Row[] {
+        return this._data;
     }
 
     public get name(): string {
@@ -85,6 +81,16 @@ export class Table {
             );
         }
         return this._data.find((row) => row.data[column.id].value === value);
+    }
+
+    public getColumnIndexByName(columnName: string): number {
+        const column = this._columns.find((col) => col.name === columnName);
+        if (!column) {
+            throw new Error(
+                `Column ${columnName} does not exist in the table.`,
+            );
+        }
+        return column.id;
     }
 
     public getColumns(columnNames?: string[]): Table {
@@ -144,9 +150,7 @@ export class Table {
     }
 
     public addMultipleRowsToTableView(rows: Row[]): void {
-        for (const row of rows) {
-            this._data.push({ rid: row.rid, data: row.data });
-        }
+        this._data.push(...rows);
 
         const primaryKeyColumn = this.primaryKeyColumn;
 

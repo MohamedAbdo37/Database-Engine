@@ -701,6 +701,15 @@ describe('Null datatype serialization and deserialization', () => {
         expect(deserialized.isNull).toBe(true);
     });
 
+    it('should deserialize a non-null CHAR into a nullable CHAR schema', () => {
+        const serialized = new CHAR('value', 5).serialize();
+
+        const deserialized = new CHAR('', 5, true).deserialize(serialized);
+
+        expect(deserialized.value).toBe('value');
+        expect(deserialized.isNull).toBe(false);
+    });
+
     it('should preserve null and non-null fields in a record', () => {
         const record = [
             new INT(42),
