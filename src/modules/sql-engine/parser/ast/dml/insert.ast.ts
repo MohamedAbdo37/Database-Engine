@@ -108,7 +108,7 @@ export class InsertAST extends DML {
                 value = null;
                 isNullable = true;
             } else if (valueToken.type === TokenType.LITERAL) {
-                value = valueToken.value;
+                value = valueToken.value.slice(1, -1); // Remove the surrounding quotes
             } else if (valueToken.type === TokenType.NUMBER) {
                 value = Number(valueToken.value);
             } else if (

@@ -23,6 +23,7 @@ export class CatalogColumn {
     isUnique: boolean;
     value: number;
     isNullable: boolean;
+    defaultValue: number | null;
 
     constructor(
         name: string,
@@ -32,6 +33,7 @@ export class CatalogColumn {
         isUnique: boolean,
         isNullable: boolean,
         value?: number,
+        defaultValue?: any | null,
     ) {
         this.name = name;
         this.id = id;
@@ -45,6 +47,7 @@ export class CatalogColumn {
             this.isNullable = false;
         }
         this.value = value || -1;
+        this.defaultValue = value ?? null;
     }
 
     public getColumnDatatypeObject(): Datatype<any> {
@@ -79,7 +82,7 @@ export class CatalogColumn {
     }
 
     public serialize(): Buffer {
-        const buffer = Buffer.alloc(18 + this.name.length * 2);
+        const buffer = Buffer.alloc(16 + this.name.length * 2);
         let offset = 0;
         buffer.writeInt16BE(this.datatype, 0);
         buffer.writeInt8(this.isPrimary ? 1 : 0, 2);
@@ -147,6 +150,10 @@ export class Catalog implements DBObjects {
     columns: CatalogColumn[];
 
     indexes: CatalogIndex[];
+
+    public getColumnByName(name: string): CatalogColumn | undefined {
+        return this.columns.find((column) => column.name === name);
+    }
 
     serialize(): Buffer {
         const tableNameLength = this.tableName.length;

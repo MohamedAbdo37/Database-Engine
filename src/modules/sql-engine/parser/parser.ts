@@ -125,7 +125,8 @@ export class ParserGenerator {
 
     private isExpressionToken(id: number): boolean {
         const token = this.tokens[id];
-        if (token === undefined) {
+        const nextToken = this.peek(id + 1);
+        if (token === undefined && nextToken === undefined) {
             return false;
         }
 
@@ -133,7 +134,8 @@ export class ParserGenerator {
             token instanceof NumberToken ||
             token.value === '+' ||
             token.value === '-' ||
-            token.equals(new KeywordToken('NOT')) ||
+            (token.equals(new KeywordToken('NOT')) &&
+                nextToken?.type !== TokenType.KEYWORD) ||
             (token.equals(new PunctuationToken('(')) &&
                 this.isParenthesizedExpressionStart(id))
         );
@@ -154,10 +156,23 @@ export class ParserGenerator {
     }
 
     private isBooleanExpression(id: number): boolean {
+        let parenthesisDepth = 0;
         for (const token of this.tokens.slice(id)) {
+            if (token.equals(new PunctuationToken('('))) {
+                parenthesisDepth++;
+                continue;
+            }
+            if (token.equals(new PunctuationToken(')'))) {
+                if (parenthesisDepth === 0) {
+                    break;
+                }
+                parenthesisDepth--;
+                continue;
+            }
             if (
-                token.equals(new PunctuationToken(',')) ||
-                token.equals(new PunctuationToken(';'))
+                parenthesisDepth === 0 &&
+                (token.equals(new PunctuationToken(',')) ||
+                    token.equals(new PunctuationToken(';')))
             ) {
                 break;
             }

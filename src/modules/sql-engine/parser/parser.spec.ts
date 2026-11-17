@@ -763,6 +763,16 @@ describe('CreateTableAST parse method', () => {
         expect(parsedAST.columns[2].datatype).toBe(DatatypeEnum.TIMESTAMP);
     });
 
+    it('should preserve datatype lengths before column constraints', () => {
+        const parsedAST = new ParserGenerator(
+            new Tokenizer().tokenize(
+                'CREATE TABLE test (name CHAR(20) NOT NULL);',
+            ),
+        ).parse() as CreateTableAST;
+
+        expect(parsedAST.columns[0].length).toBe(20);
+    });
+
     it('should throw an error for missing closing parenthesis', () => {
         const tokens = [
             new KeywordToken('CREATE'),
