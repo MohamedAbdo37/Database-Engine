@@ -6,10 +6,12 @@ import {
     LiteralToken,
     NumberToken,
     PunctuationToken,
+    SingleCharacterOperatorToken,
     Token,
 } from '../tokenizer/token.class.js';
 import { ColumnDefinition } from './ast/ddl/column-definition.ast.js';
 import { CreateTableAST } from './ast/ddl/create-table.ast.js';
+import { UpdateAST } from './ast/dml/update.ast.js';
 import { ParserGenerator } from './parser.js';
 import { Tokenizer } from '../tokenizer/tokenizer.js';
 
@@ -85,9 +87,18 @@ describe('ParserGenerator boolean expressions', () => {
         const parser = new ParserGenerator(
             new Tokenizer().tokenize(expression),
         );
-        const clean = Reflect.get(parser, 'cleanTokens') as () => void;
+        const clean = parser['cleanTokens'] as () => void;
         clean.call(parser);
         return Number(parser.peek()?.value);
+    };
+
+    const cleanExpressionWithIdentifiers = (expression: string): any => {
+        const parser = new ParserGenerator(
+            new Tokenizer().tokenize(expression),
+        );
+        const clean = parser['cleanTokens'] as () => void;
+        clean.call(parser);
+        return parser['tokens'];
     };
 
     it('applies NOT, AND, and OR precedence correctly', () => {
@@ -106,6 +117,35 @@ describe('ParserGenerator boolean expressions', () => {
         expect(cleanExpression('2 == 2')).toBe(1);
         expect(cleanExpression('2 <= 2 AND 3 >= 2')).toBe(1);
         expect(cleanExpression('(2 < 3) AND (4 > 1)')).toBe(1);
+    });
+
+    it;
+
+    it('supports identifiers and literals in boolean expressions', () => {
+        const expectedTokens = [
+            new PunctuationToken('('),
+            new NumberToken('12'),
+            new SingleCharacterOperatorToken('<'),
+            new IdentifierToken('id'),
+            new KeywordToken('AND'),
+            new IdentifierToken('age'),
+            new SingleCharacterOperatorToken('<'),
+            new LiteralToken('"exAge"'),
+            new PunctuationToken(')'),
+            new KeywordToken('OR'),
+            new KeywordToken('FALSE'),
+        ];
+        const tokens = cleanExpressionWithIdentifiers(
+            `(12 < id AND age < "exAge") OR 5 < 4`,
+        );
+        expect(tokens).toHaveLength(expectedTokens.length);
+        expectedTokens.forEach((expectedToken, index) => {
+            const actualToken = tokens[index];
+            expect(actualToken.constructor.name).toBe(
+                expectedToken.constructor.name,
+            );
+            expect(actualToken.value).toBe(expectedToken.value);
+        });
     });
 });
 
@@ -800,7 +840,7 @@ describe('CreateTableAST parse method', () => {
         );
     });
 
-    it('should throw an error for the tokens that after the simicolon', () => {
+    it('should throw an error for the tokens that after the semicolon', () => {
         const tokens = [
             new KeywordToken('CREATE'),
             new KeywordToken('TABLE'),
@@ -828,5 +868,136 @@ describe('CreateTableAST parse method', () => {
         expect(() => createTableAST.parse(parserGenerator)).toThrow(
             "Unexpected token 'WHERE' after CREATE TABLE statement at undefined.",
         );
+    });
+});
+
+describe('UpdateAST parse method', () => {
+    it('should be defined', () => {
+        expect(new UpdateAST()).toBeDefined();
+    });
+
+    it('should throw an error for missing table name', () => {
+        const tokens = [new KeywordToken('UPDATE')];
+        const parserGenerator = new ParserGenerator(tokens);
+        const updateAST = new UpdateAST();
+
+        expect(() => updateAST.parse(parserGenerator)).toThrow(
+            "Expected 'TABLE_NAME' after 'UPDATE', but found end of input.",
+        );
+    });
+
+    it('should throw an error for missing SET keyword', () => {
+        const tokens = [
+            new KeywordToken('UPDATE'),
+            new IdentifierToken('users'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const updateAST = new UpdateAST();
+
+        expect(() => updateAST.parse(parserGenerator)).toThrow(
+            "Expected 'SET' after 'UPDATE users', but found end of input.",
+        );
+    });
+
+    it('should throw an EOI error for missing column assignments', () => {
+        const tokens = [
+            new KeywordToken('UPDATE'),
+            new IdentifierToken('users'),
+            new KeywordToken('SET'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const updateAST = new UpdateAST();
+
+        expect(() => updateAST.parse(parserGenerator)).toThrow(
+            'Expected at least one column assignment in UPDATE statement, but found none.',
+        );
+    });
+
+    it('should throw an EOI error for missing WHERE keyword', () => {
+        const tokens = [
+            new KeywordToken('UPDATE'),
+            new IdentifierToken('users'),
+            new KeywordToken('SET'),
+            new IdentifierToken('age'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('42'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const updateAST = new UpdateAST();
+
+        expect(() => updateAST.parse(parserGenerator)).toThrow(
+            "Expected 'WHERE' after 'COLUMN_ASSIGNMENT', but found end of input.",
+        );
+    });
+
+    it('should throw an error for missing semicolon', () => {
+        const tokens = [
+            new KeywordToken('UPDATE'),
+            new IdentifierToken('users'),
+            new KeywordToken('SET'),
+            new IdentifierToken('age'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('42'),
+            new KeywordToken('WHERE'),
+            new IdentifierToken('id'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('1'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const updateAST = new UpdateAST();
+
+        expect(() => updateAST.parse(parserGenerator)).toThrow(
+            "Expected ';' after 'WHERE id = 1', but found end of input.",
+        );
+    });
+
+    it('should throw an error for unexpected token after semicolon', () => {
+        const tokens = [
+            new KeywordToken('UPDATE'),
+            new IdentifierToken('users'),
+            new KeywordToken('SET'),
+            new IdentifierToken('age'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('42'),
+            new KeywordToken('WHERE'),
+            new IdentifierToken('id'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('1'),
+            new PunctuationToken(';'),
+            new KeywordToken('WHERE'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const updateAST = new UpdateAST();
+
+        expect(() => updateAST.parse(parserGenerator)).toThrow(
+            "Unexpected token 'WHERE' after UPDATE Statement at undefined.",
+        );
+    });
+
+    it('should collect column assignments in an UPDATE statement', () => {
+        const parserGenerator = new ParserGenerator([
+            new KeywordToken('UPDATE'),
+            new IdentifierToken('users'),
+            new KeywordToken('SET'),
+            new IdentifierToken('age'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('42'),
+            new PunctuationToken(','),
+            new IdentifierToken('name'),
+            new SingleCharacterOperatorToken('='),
+            new LiteralToken("'John Doe'"),
+            new KeywordToken('WHERE'),
+            new IdentifierToken('id'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('1'),
+            new PunctuationToken(';'),
+        ]);
+
+        const updateAST = new UpdateAST().parse(parserGenerator) as UpdateAST;
+
+        expect(updateAST.columns).toEqual([
+            { column: 'age', value: 42, isNull: false },
+            { column: 'name', value: 'John Doe', isNull: false },
+        ]);
     });
 });

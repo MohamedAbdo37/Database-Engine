@@ -13,6 +13,7 @@ import { AST } from './ast/ast.class.js';
 import { CreateTableAST } from './ast/ddl/create-table.ast.js';
 import { DropTableAST } from './ast/ddl/drop-table.ast.js';
 import { InsertAST } from './ast/dml/insert.ast.js';
+import { UpdateAST } from './ast/dml/update.ast.js';
 
 export interface Parser {
     parse(parserGenerator: ParserGenerator): AST | null;
@@ -31,6 +32,15 @@ export class ParserGenerator {
             return this.tokens[id];
         } else if (this.tokens.length > 0) {
             return this.tokens[0];
+        }
+        return null;
+    }
+
+    public next(id?: number): Token | null {
+        if (id !== undefined && id >= 0 && id < this.tokens.length) {
+            return this.tokens[id + 1] || null;
+        } else if (this.tokens.length > 1) {
+            return this.tokens[1] || null;
         }
         return null;
     }
@@ -74,6 +84,9 @@ export class ParserGenerator {
             case new KeywordToken('INSERT').equals(token):
                 ast = new InsertAST().parse(this);
                 break;
+            case new KeywordToken('UPDATE').equals(token):
+                ast = new UpdateAST().parse(this);
+                break;
             default:
                 throw new SyntaxErrorException(
                     `Unexpected token '${token.value}' at ${token.position}.`,
@@ -92,8 +105,28 @@ export class ParserGenerator {
 
     private cleanTokens(start?: number): void {
         let id = start ?? 0;
+        const containsUnresolvedOperands = this.tokens.some(
+            (token) =>
+                token.type === TokenType.IDENTIFIER ||
+                token.type === TokenType.LITERAL,
+        );
+
         while (id < this.tokens.length) {
             if (this.isExpressionToken(id)) {
+                if (
+                    containsUnresolvedOperands &&
+                    this.tokens
+                        .slice(id)
+                        .some(
+                            (token) =>
+                                token.type === TokenType.IDENTIFIER ||
+                                token.type === TokenType.LITERAL,
+                        )
+                ) {
+                    id++;
+                    continue;
+                }
+
                 const expressionParser = new ParserGenerator(
                     this.tokens.slice(id),
                 );
@@ -111,13 +144,13 @@ export class ParserGenerator {
                     );
                 }
 
-                this.tokens.splice(
-                    id,
-                    consumed,
-                    new NumberToken(
-                        (isBoolean ? (value ? 1 : 0) : value).toString(),
-                    ),
-                );
+                const cleanedToken =
+                    isBoolean && containsUnresolvedOperands
+                        ? new KeywordToken(value ? 'TRUE' : 'FALSE')
+                        : new NumberToken(
+                              (isBoolean ? (value ? 1 : 0) : value).toString(),
+                          );
+                this.tokens.splice(id, consumed, cleanedToken);
             }
             id++;
         }

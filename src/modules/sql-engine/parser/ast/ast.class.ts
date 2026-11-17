@@ -21,9 +21,12 @@ export abstract class AST implements Parser {
         expectedToken: string,
         foundToken: string | null,
         foundTokenPosition: string | null,
+        afterToken?: string | null,
     ): never {
         throw new SyntaxErrorException(
-            `Expected 'TABLE' after '${expectedToken}', ` +
+            `Expected '${expectedToken}' ` +
+                (afterToken ? `after '${afterToken}'` : '') +
+                `, ` +
                 (foundToken !== null
                     ? `but found '${foundToken}' at ${foundTokenPosition}.`
                     : 'but found end of input.'),
