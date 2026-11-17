@@ -23,7 +23,7 @@ export interface UpdateColumnAssignment {
 export interface WhereCondition {
     leftOperand: string | number | null;
     isLeftOperandColumn: boolean;
-    operator: WhereOperator | null;
+    operator: WhereOperator;
     rightOperand: string | number | null | Column;
     isRightOperandColumn: boolean;
 }
@@ -154,7 +154,7 @@ export class UpdateAST extends DML {
         const whereCondition: WhereCondition = {
             leftOperand: null,
             isLeftOperandColumn: false,
-            operator: null,
+            operator: WhereOperator.EQUALS,
             rightOperand: null,
             isRightOperandColumn: false,
         };
@@ -169,7 +169,8 @@ export class UpdateAST extends DML {
             !leftToken ||
             (leftToken.type !== TokenType.IDENTIFIER &&
                 leftToken.type !== TokenType.LITERAL &&
-                leftToken.type !== TokenType.NUMBER)
+                leftToken.type !== TokenType.NUMBER &&
+                leftToken.type !== TokenType.KEYWORD)
         ) {
             this.missedTokenError(
                 'left_operand',
@@ -178,10 +179,33 @@ export class UpdateAST extends DML {
                 'WHERE',
             );
         }
-
-        whereCondition.leftOperand = leftToken.value;
-        if (leftToken.type === TokenType.IDENTIFIER) {
+        if (leftToken.equals(new KeywordToken('NULL'))) {
+            throw new SyntaxErrorException(
+                `Unexpected token 'NULL' at ${leftToken.position}. 'NULL' cannot be used as a left operand in a WHERE condition.`,
+            );
+        } else if (leftToken.type === TokenType.LITERAL) {
+            whereCondition.leftOperand = leftToken.value.slice(1, -1); // Remove the surrounding quotes
+        } else if (leftToken.type === TokenType.NUMBER) {
+            whereCondition.leftOperand = Number(leftToken.value);
+        } else if (
+            leftToken.equals(new KeywordToken('TRUE')) ||
+            leftToken.equals(new KeywordToken('FALSE'))
+        ) {
+            whereCondition.leftOperand = leftToken.equals(
+                new KeywordToken('TRUE'),
+            )
+                ? 1
+                : 0;
+        } else if (leftToken.type === TokenType.IDENTIFIER) {
+            whereCondition.leftOperand = leftToken.value;
             whereCondition.isLeftOperandColumn = true;
+        } else {
+            this.missedTokenError(
+                'VALUE',
+                leftToken.value,
+                leftToken.position,
+                `${leftToken.value} =`,
+            );
         }
 
         this.consume(); // Consume the left operand token
@@ -289,25 +313,49 @@ export class UpdateAST extends DML {
         }
 
         const rightToken = this.peek();
+
         if (
             !rightToken ||
             (rightToken.type !== TokenType.IDENTIFIER &&
                 rightToken.type !== TokenType.LITERAL &&
-                rightToken.type !== TokenType.NUMBER)
+                rightToken.type !== TokenType.NUMBER &&
+                rightToken.type !== TokenType.KEYWORD)
         ) {
             this.missedTokenError(
-                'right_operand',
+                'left_operand',
                 rightToken ? rightToken.value : null,
                 rightToken ? rightToken.position : null,
-                `${whereCondition.leftOperand} ${whereCondition.operator}`,
+                'WHERE',
             );
         }
-
-        whereCondition.rightOperand = rightToken.value;
-        if (rightToken.type === TokenType.IDENTIFIER) {
+        if (rightToken.equals(new KeywordToken('NULL'))) {
+            throw new SyntaxErrorException(
+                `Invalid NULL comparison at ${rightToken.position}. NULL must be compared using IS NULL or IS NOT NULL, not as a direct right-hand operand.`,
+            );
+        } else if (rightToken.type === TokenType.LITERAL) {
+            whereCondition.rightOperand = rightToken.value.slice(1, -1); // Remove the surrounding quotes
+        } else if (rightToken.type === TokenType.NUMBER) {
+            whereCondition.rightOperand = Number(rightToken.value);
+        } else if (
+            rightToken.equals(new KeywordToken('TRUE')) ||
+            rightToken.equals(new KeywordToken('FALSE'))
+        ) {
+            whereCondition.rightOperand = rightToken.equals(
+                new KeywordToken('TRUE'),
+            )
+                ? 1
+                : 0;
+        } else if (rightToken.type === TokenType.IDENTIFIER) {
+            whereCondition.rightOperand = rightToken.value;
             whereCondition.isRightOperandColumn = true;
+        } else {
+            this.missedTokenError(
+                'VALUE',
+                rightToken.value,
+                rightToken.position,
+                `${rightToken.value} =`,
+            );
         }
-
         this.consume(); // Consume the right operand token
 
         while (this.expect(new PunctuationToken(')'))) {
