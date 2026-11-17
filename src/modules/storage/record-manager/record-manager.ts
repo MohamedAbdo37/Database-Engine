@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Datatype } from '../dto/datatype.dto.js';
 import { RID } from '../dto/rid.dto.js';
 import { PageManager } from '../page-manager/page-manager.js';
+import { Row } from '../table-manager/table.dto.js';
 
 @Injectable()
 export class RecordManager {
@@ -110,6 +111,19 @@ export class RecordManager {
         return rid;
     }
 
+    public async insertRecords(
+        tableName: string,
+        record: Datatype<any>[][],
+    ): Promise<RID[]> {
+        const recordsBuffer = record.map((r) => this.serializeRecord(r));
+
+        const rid: RID[] = await this.pageManger.addRecords(
+            tableName,
+            recordsBuffer,
+        );
+        return rid;
+    }
+
     public async updateRecord(
         tableName: string,
         recordId: RID,
@@ -191,9 +205,9 @@ export class RecordManager {
     public async scanRecords(
         tableName: string,
         schema: Datatype<any>[],
-    ): Promise<Datatype<any>[][]> {
-        const records: Datatype<any>[][] = [];
-
+    ): Promise<Row[]> {
+        const records: Row[] = [];
+        let page = 1;
         for await (const pageRecords of this.pageStreamerGenerator(
             1,
             tableName,
@@ -203,8 +217,15 @@ export class RecordManager {
                     recordBuffer,
                     schema,
                 );
-                records.push(deserializedRecord);
+                records.push({
+                    rid: {
+                        pageId: page,
+                        slotNumber: records.length + 1,
+                    },
+                    data: deserializedRecord.map((field) => field.value),
+                });
             }
+            page++;
         }
 
         return records;

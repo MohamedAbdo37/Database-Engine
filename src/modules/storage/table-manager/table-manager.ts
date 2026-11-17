@@ -6,7 +6,17 @@ import { RID } from '../dto/rid.dto.js';
 import { IndexManager } from '../index-manager/index-manager.js';
 import { PageManager } from '../page-manager/page-manager.js';
 import { RecordManager } from '../record-manager/record-manager.js';
-import { Table } from './table.dto.js';
+import { Column, Table } from './table.dto.js';
+import { WhereEvaluationException } from '../exceptions/where-evaluation.exce.js';
+
+export enum WhereOperator {
+    EQUALS = '=',
+    NOT_EQUALS = '!=',
+    GREATER_THAN = '>',
+    LESS_THAN = '<',
+    GREATER_THAN_OR_EQUAL = '>=',
+    LESS_THAN_OR_EQUAL = '<=',
+}
 
 @Injectable()
 export class TableManager {
@@ -16,6 +26,48 @@ export class TableManager {
         private readonly catalogManager: CatalogManager,
         private readonly recordManager: RecordManager,
     ) {}
+
+    private getValueByIndex(column: any | Table, index: number): any {
+        if (column instanceof Table) {
+            if (column.columns.length === 0) {
+                throw new WhereEvaluationException(
+                    'The provided table has no columns. Cannot retrieve value by index.',
+                );
+            }
+            if (column.data.length > 1) {
+                throw new WhereEvaluationException(
+                    'The provided table has more than one row. Only one row is expected.',
+                );
+            }
+            return column.getRowByIndex(index)?.data[0];
+        }
+        return column;
+    }
+
+    private isValidComparison(
+        leftValue: any,
+        rightValue: any,
+        operator: WhereOperator,
+    ): boolean {
+        switch (operator) {
+            case WhereOperator.EQUALS:
+                return leftValue === rightValue;
+            case WhereOperator.NOT_EQUALS:
+                return leftValue !== rightValue;
+            case WhereOperator.GREATER_THAN:
+                return leftValue > rightValue;
+            case WhereOperator.LESS_THAN:
+                return leftValue < rightValue;
+            case WhereOperator.GREATER_THAN_OR_EQUAL:
+                return leftValue >= rightValue;
+            case WhereOperator.LESS_THAN_OR_EQUAL:
+                return leftValue <= rightValue;
+            default:
+                throw new WhereEvaluationException(
+                    `Unsupported operator: ${operator}`,
+                );
+        }
+    }
 
     public async isTableExists(tableName: string): Promise<boolean> {
         try {
@@ -46,19 +98,19 @@ export class TableManager {
         return schema;
     }
 
-    public async insertRecord(
+    public async insertRecords(
         tableName: string,
-        record: Datatype<any>[],
-    ): Promise<RID> {
+        records: Datatype<any>[][],
+    ): Promise<RID[]> {
         const schema =
             await this.catalogManager.getCatalogSchemaRecord(tableName);
-        if (record.length !== schema.length) {
+        if (records[0].length !== schema.length) {
             throw new Error(
-                `Record length (${record.length}) does not match schema length (${schema.length})`,
+                `Record length (${records[0].length}) does not match schema length (${schema.length})`,
             );
         }
 
-        return await this.recordManager.insertRecord(tableName, record);
+        return await this.recordManager.insertRecords(tableName, records);
     }
 
     public async updateRecord(
@@ -84,13 +136,19 @@ export class TableManager {
         await this.recordManager.deleteRecord(tableName, recordId);
     }
 
+    public async getCatalogSchemaRecord(
+        tableName: string,
+    ): Promise<Datatype<any>[]> {
+        return await this.catalogManager.getCatalogSchemaRecord(tableName);
+    }
+
     public async getRecord(
         tableName: string,
         recordId: RID,
         table: Table,
     ): Promise<Table> {
-        const schema =
-            await this.catalogManager.getCatalogSchemaRecord(tableName);
+        const schema = await this.getCatalogSchemaRecord(tableName);
+
         const record = await this.recordManager.retrieveRecord(
             tableName,
             recordId,
@@ -99,13 +157,62 @@ export class TableManager {
 
         if (!record) return table;
 
-        table.data = [record];
+        table.addRowToTableView(recordId, record);
 
         return table;
     }
 
-    public async scanTable(tableName: string, table: Table): Promise<Table> {
-        // TODO: Implement the logic to scan all records in the table and populate the Table object
+    public whereEvaluate(
+        table: Table,
+        operator: WhereOperator,
+        right: Column | any,
+        left: Column | any,
+    ): Table {
+        const filteredTable = new Table(table.name, table.columns);
+        let rightSide: any | Table;
+        let leftSide: any | Table;
+
+        if (right !== null && typeof right === 'object' && 'name' in right)
+            rightSide = table.getColumns([(right as Column).name]);
+        else rightSide = right;
+
+        if (left !== null && typeof left === 'object' && 'name' in left)
+            leftSide = table.getColumns([(left as Column).name]);
+        else leftSide = left;
+
+        for (let i = 0; i < table.size.rows; i++) {
+            const leftValue = this.getValueByIndex(leftSide, i);
+            const rightValue = this.getValueByIndex(rightSide, i);
+
+            if (this.isValidComparison(leftValue, rightValue, operator)) {
+                const row = table.getRowByIndex(i);
+                if (row) {
+                    filteredTable.addRowToTableView(row.rid, row.data);
+                }
+            }
+        }
+
+        return filteredTable;
+    }
+
+    public async scanTable(tableName: string): Promise<Table> {
+        const recordSchema = await this.getCatalogSchemaRecord(tableName);
+        const schema = await this.getTableSchema(tableName);
+        const columns: Column[] = schema.columns.map((col, index) => ({
+            name: col.name,
+            datatype: recordSchema[index],
+            id: index,
+            isPrimary: col.isPrimary,
+        }));
+
+        const table = new Table(tableName, columns);
+        const records = await this.recordManager.scanRecords(
+            tableName,
+            recordSchema,
+        );
+
+        table.addMultipleRowsToTableView(records);
+
         return table;
     }
 }

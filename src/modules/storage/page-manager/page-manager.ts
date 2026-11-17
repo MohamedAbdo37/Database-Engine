@@ -221,6 +221,33 @@ export class PageManager {
         return rid;
     }
 
+    public async addRecords(
+        tableName: string,
+        records: Buffer[],
+    ): Promise<RID[]> {
+        this.fileManger.openTableFile(tableName);
+        let currentPage: TablePage = await this.getCurrentPage(tableName);
+        const rids: RID[] = [];
+        for (const record of records) {
+            let slotIndex = currentPage.addTuple(record);
+            if (slotIndex === -1) {
+                await this.fileManger.writePage(currentPage);
+                currentPage = await this.createNewTablePage(tableName);
+                slotIndex = currentPage.addTuple(record);
+            }
+            rids.push({
+                pageId: currentPage.getPageId(),
+                slotNumber: slotIndex,
+            });
+        }
+
+        await this.fileManger.writePage(currentPage);
+
+        this.fileManger.closeTableFile();
+
+        return rids;
+    }
+
     public async getRecord(
         tableName: string,
         rid: RID,

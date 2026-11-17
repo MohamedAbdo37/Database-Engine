@@ -166,12 +166,18 @@ describe('RecordManager', () => {
 
         const tableName = 'test_table';
 
-        await recordManager.scanRecords(tableName, [
+        const records = await recordManager.scanRecords(tableName, [
             new INT(0),
             new CHAR('', 1),
         ]);
 
         expect(recordManager).toBeDefined();
+        expect(records).toEqual([
+            {
+                rid: { pageId: 1, slotNumber: 1 },
+                data: [1, 'A'],
+            },
+        ]);
 
         expect(
             recordManager['pageStreamerGenerator'](1, tableName),
