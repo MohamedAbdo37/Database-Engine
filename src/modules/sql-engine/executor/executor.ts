@@ -28,8 +28,8 @@ import {
     VARCHAR,
 } from '../../storage/dto/datatype.dto.js';
 import { UpdateAST } from '../parser/ast/dml/update.ast.js';
-import { Column, Row, Table } from '../../storage/table-manager/table.dto.js';
-import { RID } from '../../storage/dto/rid.dto.js';
+import { Column, Table } from '../../storage/table-manager/table.dto.js';
+import { DeleteAST } from '../parser/ast/dml/delete.ast.js';
 
 @Injectable()
 export class Executor {
@@ -56,7 +56,7 @@ export class Executor {
                 await this.executeUpdate(ast as UpdateAST);
                 break;
             case DMLType.DELETE:
-                // Implement delete logic here
+                await this.executeDelete(ast as DeleteAST);
                 break;
             default:
                 throw new Error(`Unsupported AST type: ${ast.type}`);
@@ -158,16 +158,6 @@ export class Executor {
             this.tableManager.getTableSchema(ast.tableName),
             this.tableManager.getCatalogSchemaRecord(ast.tableName),
         ]);
-
-        for (const field of recordSchema) {
-            console.log(
-                `Field: ${field}, Value: ${field.value}, IsNull: ${field.isNull}, Type: ${field.type}, Size: ${field.size},` +
-                    (field.type === DatatypeEnum.CHAR ||
-                    field.type === DatatypeEnum.VARCHAR
-                        ? ` length: ${(field as VARCHAR).length}`
-                        : ''),
-            );
-        }
 
         const records = ast.rows.map((row) =>
             this.createInsertRecord(
@@ -397,6 +387,92 @@ export class Executor {
         await this.tableManager.updateRecords(
             ast.tableName,
             await this.tableManager.getCatalogSchemaRecord(ast.tableName),
+            filteredTable.rows,
+        );
+    }
+
+    private async executeDelete(ast: DeleteAST): Promise<void> {
+        const isTableExists = await this.tableManager.isTableExists(
+            ast.tableName,
+        );
+
+        if (!isTableExists) {
+            throw new ExecutionErrorException(
+                `Table '${ast.tableName}' does not exist. Cannot perform delete operation.`,
+            );
+        }
+
+        const table: Table = await this.tableManager.scanTable(ast.tableName);
+
+        if (!ast.whereCondition) {
+            await this.tableManager.deleteRecords(ast.tableName, table.rows);
+            return;
+        }
+
+        let filteredTable: Table;
+
+        let rightOperandValue: any;
+        let leftOperandValue: any;
+
+        const schema = await this.tableManager.getTableSchema(ast.tableName);
+
+        if (ast.whereCondition.isRightOperandColumn) {
+            const schemaColumn = schema.columns.find(
+                (col) => col.name === ast.whereCondition!.rightOperand,
+            );
+
+            if (!schemaColumn) {
+                throw new ExecutionErrorException(
+                    `Column '${ast.whereCondition.rightOperand}' does not exist in table '${ast.tableName}'.`,
+                );
+            }
+
+            const column: Column = {
+                name: schemaColumn.name,
+                datatype: this.getDatatypeInstance(
+                    schemaColumn?.datatype,
+                    schemaColumn.value,
+                ),
+                id: schemaColumn.id,
+                isPrimary: schemaColumn.isPrimary,
+            };
+
+            rightOperandValue = column;
+        } else rightOperandValue = ast.whereCondition.rightOperand;
+
+        if (ast.whereCondition.isLeftOperandColumn) {
+            const schemaColumn = schema.columns.find(
+                (col) => col.name === ast.whereCondition!.leftOperand,
+            );
+
+            if (!schemaColumn) {
+                throw new ExecutionErrorException(
+                    `Column '${ast.whereCondition.leftOperand}' does not exist in table '${ast.tableName}'.`,
+                );
+            }
+
+            const column: Column = {
+                name: schemaColumn.name,
+                datatype: this.getDatatypeInstance(
+                    schemaColumn?.datatype,
+                    schemaColumn.value,
+                ),
+                id: schemaColumn.id,
+                isPrimary: schemaColumn.isPrimary,
+            };
+
+            leftOperandValue = column;
+        } else leftOperandValue = ast.whereCondition.leftOperand;
+
+        filteredTable = this.tableManager.whereEvaluate(
+            table,
+            ast.whereCondition.operator,
+            rightOperandValue,
+            leftOperandValue,
+        );
+
+        await this.tableManager.deleteRecords(
+            ast.tableName,
             filteredTable.rows,
         );
     }

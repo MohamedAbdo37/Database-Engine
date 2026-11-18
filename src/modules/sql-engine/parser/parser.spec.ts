@@ -14,6 +14,7 @@ import { CreateTableAST } from './ast/ddl/create-table.ast.js';
 import { UpdateAST } from './ast/dml/update.ast.js';
 import { ParserGenerator } from './parser.js';
 import { Tokenizer } from '../tokenizer/tokenizer.js';
+import { DeleteAST } from './ast/dml/delete.ast.js';
 
 describe('ParserGenerator parse method', () => {
     it('should be defined', () => {
@@ -999,5 +1000,121 @@ describe('UpdateAST parse method', () => {
             { column: 'age', value: 42, isNull: false },
             { column: 'name', value: 'John Doe', isNull: false },
         ]);
+    });
+});
+
+describe('DeleteAST parse method', () => {
+    it('should be defined', () => {
+        expect(new DeleteAST()).toBeDefined();
+    });
+
+    it('should throw an EOI error for missing FROM key word', () => {
+        const tokens = [new KeywordToken('DELETE')];
+        const parserGenerator = new ParserGenerator(tokens);
+        const deleteAST = new DeleteAST();
+
+        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+            "Expected 'FROM' after 'DELETE', but found end of input.",
+        );
+    });
+
+    it('should throw an error for missing Table name', () => {
+        const tokens = [
+            new KeywordToken('DELETE'),
+            new KeywordToken('FROM'),
+            new KeywordToken('Where'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const deleteAST = new DeleteAST();
+
+        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+            "Expected 'table name' after 'DELETE FROM', but found 'Where' at undefined.",
+        );
+    });
+
+    it('should not throw an error for missing WHERE key word', () => {
+        const tokens = [
+            new KeywordToken('DELETE'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('test'),
+            new PunctuationToken(';'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const deleteAST = new DeleteAST();
+
+        expect(() => deleteAST.parse(parserGenerator)).not.toThrow();
+    });
+
+    it('should throw an EOI error for missing semicolon', () => {
+        const tokens = [
+            new KeywordToken('DELETE'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('test'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const deleteAST = new DeleteAST();
+
+        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+            "Expected 'WHERE' or ';' after 'DELETE FROM test', but found end of input.",
+        );
+    });
+
+    it('should throw an error for unexpected token after WHERE condition', () => {
+        const tokens = [
+            new KeywordToken('DELETE'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('test'),
+            new KeywordToken('WHERE'),
+            new IdentifierToken('id'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('5'),
+            new KeywordToken('WHERE'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const deleteAST = new DeleteAST();
+
+        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+            "Expected ';' after 'DELETE FROM test WHERE id = 5', but found 'WHERE' at undefined.",
+        );
+    });
+
+    it('should throw an error for unexpected token after semicolon', () => {
+        const tokens = [
+            new KeywordToken('DELETE'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('test'),
+            new PunctuationToken(';'),
+            new KeywordToken('WHERE'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const deleteAST = new DeleteAST();
+
+        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+            "Unexpected token 'WHERE' after DELETE Statement at undefined.",
+        );
+    });
+
+    it('should parse where condition correctly', () => {
+        const tokens = [
+            new KeywordToken('DELETE'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('test'),
+            new KeywordToken('Where'),
+            new IdentifierToken('id'),
+            new SingleCharacterOperatorToken('='),
+            new NumberToken('5'),
+            new PunctuationToken(';'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const deleteAST = new DeleteAST();
+
+        const ast = deleteAST.parse(parserGenerator) as DeleteAST;
+        expect(ast.tableName).toBe('test');
+        expect(ast.whereCondition).toBeDefined();
+        expect(ast.whereCondition?.leftOperand).toBe('id');
+        expect(ast.whereCondition?.isLeftOperandColumn).toBe(true);
+        expect(ast.whereCondition?.operator).toBe('=');
+        expect(ast.whereCondition?.rightOperand).toBe(5);
+        expect(ast.whereCondition?.isRightOperandColumn).toBe(false);
     });
 });

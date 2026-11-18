@@ -236,6 +236,19 @@ export class RecordManager {
         await this.pageManger.deleteRecord(tableName, recordId);
     }
 
+    public async deleteRecords(
+        tableName: string,
+        recordIds: RID[],
+    ): Promise<void> {
+        const orderedRecordIds = recordIds.sort((a, b) => {
+            if (a.pageId === b.pageId) {
+                return a.slotNumber - b.slotNumber;
+            }
+            return a.pageId - b.pageId;
+        });
+        await this.pageManger.deleteRecords(tableName, orderedRecordIds);
+    }
+
     public async scanRecords(
         tableName: string,
         schema: Datatype<any>[],

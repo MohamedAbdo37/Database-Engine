@@ -169,6 +169,14 @@ export class TableManager {
         await this.recordManager.deleteRecord(tableName, recordId);
     }
 
+    public async deleteRecords(
+        tableName: string,
+        records: Row[],
+    ): Promise<void> {
+        const recordIds = records.map((record) => record.rid);
+        await this.recordManager.deleteRecords(tableName, recordIds);
+    }
+
     public async getCatalogSchemaRecord(
         tableName: string,
     ): Promise<Datatype<any>[]> {

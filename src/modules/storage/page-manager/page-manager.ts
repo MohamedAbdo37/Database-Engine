@@ -273,6 +273,32 @@ export class PageManager {
         this.fileManger.closeTableFile();
     }
 
+    public async deleteRecords(tableName: string, rids: RID[]): Promise<void> {
+        if (rids.length === 0) {
+            return;
+        }
+
+        this.fileManger.openTableFile(tableName);
+        let currentPageId = rids[0].pageId;
+        let page = (await this.getTablePage(
+            tableName,
+            currentPageId,
+        )) as TablePage;
+        for (const rid of rids) {
+            if (rid.pageId !== currentPageId) {
+                await this.fileManger.writePage(page);
+                currentPageId = rid.pageId;
+                page = (await this.getTablePage(
+                    tableName,
+                    currentPageId,
+                )) as TablePage;
+            }
+            page.deleteTuple(rid.slotNumber);
+        }
+        await this.fileManger.writePage(page);
+        this.fileManger.closeTableFile();
+    }
+
     public async updateRecord(
         tableName: string,
         rid: RID,

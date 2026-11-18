@@ -174,8 +174,8 @@ describe('RecordManager', () => {
         expect(recordManager).toBeDefined();
         expect(records).toEqual([
             {
-                rid: { pageId: 1, slotNumber: 1 },
-                data: [1, 'A'],
+                rid: { pageId: 1, slotNumber: 0 },
+                data: [new INT(1), new CHAR('A', 1)],
             },
         ]);
 
@@ -746,8 +746,6 @@ describe('Null datatype serialization and deserialization', () => {
         expect(deserialized[2].value).toBe(true);
         expect(deserialized[3].value).toBe(3.14);
         expect(deserialized[5].value).toBe(123);
-        expect(deserialized[7].value).toEqual(
-            new Date('2024-01-01T00:00:00Z'),
-        );
+        expect(deserialized[7].value).toEqual(new Date('2024-01-01T00:00:00Z'));
     });
 });
