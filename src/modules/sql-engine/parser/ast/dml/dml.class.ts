@@ -12,7 +12,9 @@ export abstract class DML extends MainClassAST {
 export interface WhereCondition {
     leftOperand: string | number | null;
     isLeftOperandColumn: boolean;
+    leftColumnRef?: string;
     operator: WhereOperator;
     rightOperand: string | number | null | Column;
     isRightOperandColumn: boolean;
+    rightColumnRef?: string;
 }

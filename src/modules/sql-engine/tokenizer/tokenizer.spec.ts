@@ -439,12 +439,14 @@ describe('Tokenizer', () => {
         expect(tokens.length).toBe(0);
     });
 
-    it('should have no matching token for a dot', () => {
+    it('should have PunctuationToken for a dot', () => {
         const tokenizer = new Tokenizer();
         const text = '.';
         const tokens = tokenizer['isMatchingToken'](text);
 
-        expect(tokens.length).toBe(0);
+        expect(tokens.length).toBe(1);
+        expect(tokens[0].type).toBe('PUNCTUATION');
+        expect(tokens[0].value).toBe('.');
     });
 
     it('should have identifier token for a valid identifier', () => {

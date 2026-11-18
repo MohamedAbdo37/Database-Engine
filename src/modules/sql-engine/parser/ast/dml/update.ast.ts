@@ -144,9 +144,11 @@ export class UpdateAST extends DML {
         const whereCondition: WhereCondition = {
             leftOperand: null,
             isLeftOperandColumn: false,
+            leftColumnRef: undefined,
             operator: WhereOperator.EQUALS,
             rightOperand: null,
             isRightOperandColumn: false,
+            rightColumnRef: undefined,
         };
         const openPrenticesToken: Token[] = [];
         while (this.expect(new PunctuationToken('('))) {

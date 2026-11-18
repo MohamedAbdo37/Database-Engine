@@ -15,6 +15,8 @@ import { UpdateAST } from './ast/dml/update.ast.js';
 import { ParserGenerator } from './parser.js';
 import { Tokenizer } from '../tokenizer/tokenizer.js';
 import { DeleteAST } from './ast/dml/delete.ast.js';
+import { DropTableAST } from './ast/ddl/drop-table.ast.js';
+import { OrderDirection, SelectAST } from './ast/select.class.js';
 
 describe('ParserGenerator parse method', () => {
     it('should be defined', () => {
@@ -872,6 +874,130 @@ describe('CreateTableAST parse method', () => {
     });
 });
 
+describe('DropTableAST parse method', () => {
+    it('should be defined', () => {
+        expect(new DropTableAST()).toBeDefined();
+    });
+
+    it('should throw an error for missing table name', () => {
+        const tokens = [new KeywordToken('DROP'), new KeywordToken('TABLE')];
+        const parserGenerator = new ParserGenerator(tokens);
+        const dropTableAST = new DropTableAST();
+
+        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+            "Expected table name after 'DROP TABLE', but found end of input.",
+        );
+    });
+
+    it('should throw an error for missing semicolon', () => {
+        const tokens = [
+            new KeywordToken('DROP'),
+            new KeywordToken('TABLE'),
+            new IdentifierToken('my_table'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const dropTableAST = new DropTableAST();
+
+        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+            "Expected ';' after 'DROP TABLE my_table', but found end of input.",
+        );
+    });
+
+    it('should throw an error for unexpected token after semicolon', () => {
+        const tokens = [
+            new KeywordToken('DROP'),
+            new KeywordToken('TABLE'),
+            new IdentifierToken('my_table'),
+            new PunctuationToken(';'),
+            new KeywordToken('WHERE'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const dropTableAST = new DropTableAST();
+
+        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+            "Unexpected token 'WHERE' after DROP TABLE statement at undefined.",
+        );
+    });
+
+    it('should correctly parse a valid DROP TABLE statement', () => {
+        const tokens = [
+            new KeywordToken('DROP'),
+            new KeywordToken('TABLE'),
+            new IdentifierToken('my_table'),
+            new PunctuationToken(';'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const dropTableAST = new DropTableAST();
+
+        const parsedAST = dropTableAST.parse(parserGenerator) as DropTableAST;
+
+        expect(parsedAST.tableName).toBe('my_table');
+    });
+
+    it('should throw an error for unexpected token after DROP TABLE statement', () => {
+        const tokens = [
+            new KeywordToken('DROP'),
+            new KeywordToken('TABLE'),
+            new IdentifierToken('my_table'),
+            new PunctuationToken(';'),
+            new KeywordToken('WHERE'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const dropTableAST = new DropTableAST();
+
+        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+            "Unexpected token 'WHERE' after DROP TABLE statement at undefined.",
+        );
+    });
+
+    it('should throw an error for in complete IF EXISTS clause', () => {
+        const tokens = [
+            new KeywordToken('DROP'),
+            new KeywordToken('TABLE'),
+            new KeywordToken('IF'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const dropTableAST = new DropTableAST();
+
+        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+            "Expected 'EXISTS' after 'IF' in DROP TABLE statement, but found end of input.",
+        );
+    });
+
+    it('should throw an error for missing table name after IF EXISTS clause', () => {
+        const tokens = [
+            new KeywordToken('DROP'),
+            new KeywordToken('TABLE'),
+            new KeywordToken('IF'),
+            new KeywordToken('EXISTS'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const dropTableAST = new DropTableAST();
+
+        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+            "Expected table name after 'DROP TABLE IF EXISTS', but found end of input.",
+        );
+    });
+
+    it('should correctly parse a valid DROP TABLE IF EXISTS statement', () => {
+        const tokens = [
+            new KeywordToken('DROP'),
+            new KeywordToken('TABLE'),
+            new KeywordToken('IF'),
+            new KeywordToken('EXISTS'),
+            new IdentifierToken('my_table'),
+            new PunctuationToken(';'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const dropTableAST = new DropTableAST();
+
+        const parsedAST = dropTableAST.parse(parserGenerator) as DropTableAST;
+
+        expect(parsedAST.tableName).toBe('my_table');
+        expect(parsedAST.ifExists).toBe(true);
+    });
+});
+
 describe('UpdateAST parse method', () => {
     it('should be defined', () => {
         expect(new UpdateAST()).toBeDefined();
@@ -1116,5 +1242,122 @@ describe('DeleteAST parse method', () => {
         expect(ast.whereCondition?.operator).toBe('=');
         expect(ast.whereCondition?.rightOperand).toBe(5);
         expect(ast.whereCondition?.isRightOperandColumn).toBe(false);
+    });
+});
+
+describe('SelectAST parse method', () => {
+    it('should be defined', () => {
+        expect(new SelectAST()).toBeDefined();
+    });
+
+    it('should throw an error for missing FROM keyword', () => {
+        const tokens = [new KeywordToken('SELECT'), new IdentifierToken('id')];
+        const parserGenerator = new ParserGenerator(tokens);
+        const selectAST = new SelectAST();
+
+        expect(() => selectAST.parse(parserGenerator)).toThrow(
+            "Expected 'FROM' after 'SELECT id', but found end of input.",
+        );
+    });
+
+    it('should throw an error for missing table name after FROM', () => {
+        const tokens = [
+            new KeywordToken('SELECT'),
+            new IdentifierToken('id'),
+            new KeywordToken('FROM'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const selectAST = new SelectAST();
+
+        expect(() => selectAST.parse(parserGenerator)).toThrow(
+            "Expected 'TABLE_NAME' after 'FROM', but found end of input.",
+        );
+    });
+
+    it('should throw an error for missing semicolon at the end', () => {
+        const tokens = [
+            new KeywordToken('SELECT'),
+            new IdentifierToken('id'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('users'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const selectAST = new SelectAST();
+
+        expect(() => selectAST.parse(parserGenerator)).toThrow(
+            "Expected ';' after 'SELECT statement', but found end of input.",
+        );
+    });
+
+    it('should throw an error for unexpected token after semicolon', () => {
+        const tokens = [
+            new KeywordToken('SELECT'),
+            new IdentifierToken('id'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('users'),
+            new PunctuationToken(';'),
+            new KeywordToken('WHERE'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const selectAST = new SelectAST();
+
+        expect(() => selectAST.parse(parserGenerator)).toThrow(
+            "Unexpected token 'WHERE' after SELECT statement at undefined.",
+        );
+    });
+
+    it('should correctly parse a valid SELECT statement', () => {
+        const tokens = [
+            new KeywordToken('SELECT'),
+            new IdentifierToken('id'),
+            new PunctuationToken(','),
+            new IdentifierToken('name'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('users'),
+            new KeywordToken('WHERE'),
+            new IdentifierToken('age'),
+            new SingleCharacterOperatorToken('>'),
+            new NumberToken('18'),
+            new KeywordToken('ORDER'),
+            new KeywordToken('BY'),
+            new IdentifierToken('name'),
+            new KeywordToken('ASC'),
+            new PunctuationToken(';'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const selectAST = new SelectAST();
+
+        const parsedAST = selectAST.parse(parserGenerator) as SelectAST;
+
+        expect(parsedAST.selectColumns).toEqual([
+            { name: 'id' },
+            { name: 'name' },
+        ]);
+        expect(parsedAST.from).toEqual([{ tableName: 'users' }]);
+        expect(parsedAST.whereClause).toBeDefined();
+        expect(parsedAST.whereClause?.leftOperand).toBe('age');
+        expect(parsedAST.whereClause?.operator).toBe('>');
+        expect(parsedAST.whereClause?.rightOperand).toBe(18);
+        expect(parsedAST.orderByClause).toEqual({
+            column: { name: 'name' },
+            direction: OrderDirection.ASC,
+        });
+    });
+
+    it('should correctly parse a SELECT statement with *', () => {
+        const tokens = [
+            new KeywordToken('SELECT'),
+            new SingleCharacterOperatorToken('*'),
+            new KeywordToken('FROM'),
+            new IdentifierToken('users'),
+            new PunctuationToken(';'),
+        ];
+        const parserGenerator = new ParserGenerator(tokens);
+        const selectAST = new SelectAST();
+
+        const parsedAST = selectAST.parse(parserGenerator) as SelectAST;
+
+        expect(parsedAST.selectColumns).toBe('*');
+        expect(parsedAST.from).toEqual([{ tableName: 'users' }]);
     });
 });

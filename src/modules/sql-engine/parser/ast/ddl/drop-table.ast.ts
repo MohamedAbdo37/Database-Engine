@@ -1,5 +1,8 @@
 import { SyntaxErrorException } from '../../../exceptions/syntax-error.exc.js';
-import { KeywordToken } from '../../../tokenizer/token.class.js';
+import {
+    KeywordToken,
+    PunctuationToken,
+} from '../../../tokenizer/token.class.js';
 import { ParserGenerator } from '../../parser.js';
 import { AST, DDLType } from '../ast.class.js';
 import { DDL } from './ddl.class.js';
@@ -30,7 +33,7 @@ export class DropTableAST extends DDL {
             if (!parser.expect(new KeywordToken('EXISTS'))) {
                 const token = parser.peek();
                 throw new SyntaxErrorException(
-                    `Expected 'EXISTS' after 'IF', ` +
+                    `Expected 'EXISTS' after 'IF' in DROP TABLE statement, ` +
                         (token !== null
                             ? `but found '${token?.value}' at ${token?.position}.`
                             : 'but found end of input.'),
@@ -55,12 +58,15 @@ export class DropTableAST extends DDL {
         }
         this.tableName = tableNameToken.value;
 
-        if (!parser.expect(new KeywordToken(';'))) {
+        if (!parser.expect(new PunctuationToken(';'))) {
             const token = parser.peek();
             this.missedTokenError(
-                `';'`,
+                `;`,
                 token?.value ?? null,
                 token?.position ?? null,
+                `DROP TABLE` +
+                    (this.ifExists ? ` IF EXISTS` : ``) +
+                    ` ${this.tableName}`,
             );
         }
 
@@ -69,7 +75,7 @@ export class DropTableAST extends DDL {
         if (parser.peek() !== null) {
             const token = parser.peek();
             throw new SyntaxErrorException(
-                `Unexpected token '${token?.value}' at ${token?.position}. Expected end of input.`,
+                `Unexpected token '${token?.value}' after DROP TABLE statement at ${token?.position}.`,
             );
         }
 

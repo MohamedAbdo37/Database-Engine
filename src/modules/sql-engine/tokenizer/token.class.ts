@@ -193,7 +193,7 @@ export class LiteralToken extends Token {
 
 export class PunctuationToken extends Token {
     constructor(value: string = '') {
-        const regex = new RegExp(`^([(),;])`);
+        const regex = new RegExp(`^([(),;.])`);
         super(TokenType.PUNCTUATION, regex);
 
         this.value = value;

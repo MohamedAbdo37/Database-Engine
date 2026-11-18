@@ -15,6 +15,7 @@ import { DropTableAST } from './ast/ddl/drop-table.ast.js';
 import { InsertAST } from './ast/dml/insert.ast.js';
 import { UpdateAST } from './ast/dml/update.ast.js';
 import { DeleteAST } from './ast/dml/delete.ast.js';
+import { SelectAST } from './ast/select.class.js';
 
 export interface Parser {
     parse(parserGenerator: ParserGenerator): AST | null;
@@ -90,6 +91,9 @@ export class ParserGenerator {
                 break;
             case new KeywordToken('DELETE').equals(token):
                 ast = new DeleteAST().parse(this);
+                break;
+            case new KeywordToken('SELECT').equals(token):
+                ast = new SelectAST().parse(this);
                 break;
             default:
                 throw new SyntaxErrorException(
