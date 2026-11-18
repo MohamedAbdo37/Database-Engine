@@ -1,6 +1,4 @@
-import { after } from 'node:test';
 import { WhereOperator } from '../../../../storage/table-manager/table-manager.js';
-import { Column } from '../../../../storage/table-manager/table.dto.js';
 import { SyntaxErrorException } from '../../../exceptions/syntax-error.exc.js';
 import {
     KeywordToken,
@@ -12,20 +10,12 @@ import {
 } from '../../../tokenizer/token.class.js';
 import { ParserGenerator } from '../../parser.js';
 import { AST, DMLType } from '../ast.class.js';
-import { DML } from './dml.class.js';
+import { DML, WhereCondition } from './dml.class.js';
 
 export interface UpdateColumnAssignment {
     column: string;
     value: any;
     isNull: boolean;
-}
-
-export interface WhereCondition {
-    leftOperand: string | number | null;
-    isLeftOperandColumn: boolean;
-    operator: WhereOperator;
-    rightOperand: string | number | null | Column;
-    isRightOperandColumn: boolean;
 }
 
 export class UpdateAST extends DML {

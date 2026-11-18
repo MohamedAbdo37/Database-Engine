@@ -46,7 +46,7 @@ export class DropTableAST extends DDL {
             throw new SyntaxErrorException(
                 `Expected table name after ` +
                     (this.ifExists
-                        ? `'DROP TABLE IF EXISTS'`
+                        ? `'DROP TABLE IF EXISTS', `
                         : `'DROP TABLE', `) +
                     (tableNameToken !== null
                         ? `but found '${tableNameToken.value}' at ${tableNameToken.position}.`
@@ -54,6 +54,24 @@ export class DropTableAST extends DDL {
             );
         }
         this.tableName = tableNameToken.value;
+
+        if (!parser.expect(new KeywordToken(';'))) {
+            const token = parser.peek();
+            this.missedTokenError(
+                `';'`,
+                token?.value ?? null,
+                token?.position ?? null,
+            );
+        }
+
+        parser.consume(); // Consume the semicolon
+
+        if (parser.peek() !== null) {
+            const token = parser.peek();
+            throw new SyntaxErrorException(
+                `Unexpected token '${token?.value}' at ${token?.position}. Expected end of input.`,
+            );
+        }
 
         return this;
     }
