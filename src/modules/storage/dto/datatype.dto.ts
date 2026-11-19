@@ -12,6 +12,12 @@ export enum DatatypeEnum {
 }
 
 export abstract class Datatype<T> {
+    static CHAR(executor: any, CHAR: any, arg2: number, arg3: string): any {
+        throw new Error('Method not implemented.');
+    }
+    static serialize(): any {
+        throw new Error('Method not implemented.');
+    }
     protected _value: T;
     private _type: DatatypeEnum;
     private _size: number;

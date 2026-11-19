@@ -1,3 +1,4 @@
+import { Catalog } from '../../../storage/dto/catalog.dto.js';
 import { WhereOperator } from '../../../storage/table-manager/table-manager.js';
 import { SyntaxErrorException } from '../../exceptions/syntax-error.exc.js';
 import {
@@ -20,12 +21,14 @@ export enum OrderDirection {
 export interface FromClause {
     tableName: string;
     alias?: string;
+    schema?: Catalog;
 }
 
 export interface SelectClause {
     name: string;
     as?: string;
     from?: string;
+    tableName?: string;
 }
 
 export interface OrderByClause {
@@ -105,6 +108,34 @@ export class SelectAST extends MainClassAST {
             .join(', ');
     }
 
+    private isColumnExists(column: SelectClause, position: string): void {
+        if (this.selectColumns === '*') {
+            throw new Error(
+                'Cannot check for column existence when selectColumns is set to "*".',
+            );
+        }
+
+        const columnExists = this.selectColumns.find(
+            (col) => col.name === column.name,
+        );
+
+        if (!columnExists) {
+            return;
+        }
+
+        if (!column.from) {
+            throw new SyntaxErrorException(
+                `Ambiguous column reference '${column.name}' at ${position}. The column exists in multiple tables, but no table alias or name was provided to disambiguate it.`,
+            );
+        }
+
+        if (column.from === columnExists.from) {
+            throw new SyntaxErrorException(
+                `Duplicate column reference '${column.name}' from table '${column.from}' at ${position}. The same column is being selected multiple times.`,
+            );
+        }
+    }
+
     private parseSelectColumns(): void {
         const column: SelectClause = {
             name: '',
@@ -149,6 +180,7 @@ export class SelectAST extends MainClassAST {
             );
         }
 
+        this.isColumnExists(column, columnNameToken.position);
         column.name = this.consume()!.value;
 
         if (this.expect(new KeywordToken('AS'))) {
@@ -200,6 +232,27 @@ export class SelectAST extends MainClassAST {
         }
     }
 
+    private isTableExists(table: FromClause, position: string): void {
+        const tableExists = this.from.find(
+            (tbl) => tbl.tableName === table.tableName,
+        );
+
+        if (!tableExists) {
+            return;
+        }
+
+        if (!table.alias) {
+            throw new SyntaxErrorException(
+                `Ambiguous table reference '${table.tableName}' at ${position}. The table exists in the FROM clause, but no alias was provided to disambiguate it.`,
+            );
+        }
+
+        if (table.alias === tableExists.alias)
+            throw new SyntaxErrorException(
+                `Duplicate table reference '${table.tableName}' with alias '${table.alias}' at ${position}. The same table is being referenced multiple times with the same alias.`,
+            );
+    }
+
     private parseFromClause(): void {
         const table: FromClause = { tableName: '', alias: undefined };
         const tableNameToken = this.peek();
@@ -223,6 +276,7 @@ export class SelectAST extends MainClassAST {
             table.alias = this.consume()!.value;
         }
 
+        this.isTableExists(table, tableNameToken.position);
         this.from.push(table);
 
         if (this.expect(new PunctuationToken(','))) {

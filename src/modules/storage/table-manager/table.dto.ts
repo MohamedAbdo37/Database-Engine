@@ -6,6 +6,7 @@ export interface Column {
     datatype: Datatype<any>;
     id: number;
     isPrimary: boolean;
+    isUnique: boolean;
 }
 
 export interface Row {

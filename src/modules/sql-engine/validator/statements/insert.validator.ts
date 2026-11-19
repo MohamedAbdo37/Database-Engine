@@ -138,7 +138,7 @@ export class InsertValidator implements ValidatorIF {
     ): void {
         if (!schemaColumn.isNullable && schemaColumn.defaultValue === null) {
             throw new ExecutionErrorException(
-                `Column '${schemaColumn.name}' is required and cannot be null in table '${tableName}'.`,
+                `Column '${schemaColumn.name}' is required in table '${tableName}' and cannot be null.`,
             );
         }
     }

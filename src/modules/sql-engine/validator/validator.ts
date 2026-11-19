@@ -66,7 +66,7 @@ export class Validator implements ValidatorIF {
         tableManager: TableManager,
     ): Promise<void> {
         if (!(await tableManager.isTableExists(tableName))) {
-            throw new Error(`Table ${tableName} does not exist.`);
+            throw new Error(`Table '${tableName}' does not exist.`);
         }
     }
 }

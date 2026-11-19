@@ -33,14 +33,14 @@ export class WhereCondition {
 
         if (typeof operand !== 'string') {
             throw new ExecutionErrorException(
-                `Expected a column name as a string, but got ${typeof operand}.`,
+                `Expected a column name as a string, but got '${typeof operand}'.`,
             );
         }
 
         const column = schema.getColumnByName(operand as string);
         if (!column) {
             throw new ExecutionErrorException(
-                `Column ${operand} does not exist in table ${schema.tableName}.`,
+                `Column '${operand}' does not exist in table '${schema.tableName}'.`,
             );
         }
 

@@ -31,13 +31,11 @@ export class UpdateAST extends DML {
         this._whereCondition = value;
     }
 
-    public get columns(): { column: string; value: any; isNull: boolean }[] {
+    public get columns(): UpdateColumnAssignment[] {
         return this._columns;
     }
 
-    public set columns(
-        value: { column: string; value: any; isNull: boolean }[],
-    ) {
+    public set columns(value: UpdateColumnAssignment[]) {
         this._columns = value;
     }
 

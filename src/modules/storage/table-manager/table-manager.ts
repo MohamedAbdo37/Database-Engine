@@ -16,6 +16,8 @@ export enum WhereOperator {
     LESS_THAN = '<',
     GREATER_THAN_OR_EQUAL = '>=',
     LESS_THAN_OR_EQUAL = '<=',
+    AND = 'AND',
+    OR = 'OR',
 }
 
 @Injectable()
@@ -67,6 +69,10 @@ export class TableManager {
                 return leftValue >= rightValue;
             case WhereOperator.LESS_THAN_OR_EQUAL:
                 return leftValue <= rightValue;
+            case WhereOperator.AND:
+                return Boolean(leftValue) && Boolean(rightValue);
+            case WhereOperator.OR:
+                return Boolean(leftValue) || Boolean(rightValue);
             default:
                 throw new WhereEvaluationException(
                     `Unsupported operator: ${operator}`,
@@ -92,6 +98,10 @@ export class TableManager {
             true,
         );
         await this.catalogManager.createCatalog(schema);
+    }
+
+    public async updateCatalog(schema: Catalog): Promise<void> {
+        await this.catalogManager.updateCatalog(schema);
     }
 
     public async dropTable(tableName: string): Promise<void> {
@@ -244,6 +254,7 @@ export class TableManager {
             datatype: recordSchema[index],
             id: index,
             isPrimary: col.isPrimary,
+            isUnique: col.isUnique,
         }));
 
         const table = new Table(tableName, columns);

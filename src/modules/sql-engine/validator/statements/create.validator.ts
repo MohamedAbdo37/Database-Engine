@@ -31,5 +31,34 @@ export class CreateValidator implements ValidatorIF {
                 `Table '${ast.tableName}' already exists. Use 'IF NOT EXISTS' clause to avoid this error.`,
             );
         }
+
+        if (ast.columns.length === 0) {
+            throw new ExecutionErrorException(
+                `Table '${ast.tableName}' must have at least one column defined.`,
+            );
+        }
+
+        const primaryKeyColumns = ast.columns.filter((column) =>
+            column.constraints.some(
+                (constraint) => constraint === ColumnConstraintEnum.PRIMARY_KEY,
+            ),
+        );
+
+        if (primaryKeyColumns.length > 1) {
+            throw new ExecutionErrorException(
+                `Table '${ast.tableName}' cannot have multiple primary keys defined.`,
+            );
+        }
+
+        for (const column of ast.columns) {
+            if (
+                column.constraints.includes(ColumnConstraintEnum.PRIMARY_KEY) &&
+                column.constraints.includes(ColumnConstraintEnum.NULLABLE)
+            ) {
+                throw new ExecutionErrorException(
+                    `Column '${column.name}' cannot be both primary and nullable.`,
+                );
+            }
+        }
     }
 }
