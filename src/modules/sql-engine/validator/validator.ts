@@ -10,6 +10,10 @@ import { UpdateValidator } from './statements/update.validator.js';
 import { DeleteValidator } from './statements/delete.validator.js';
 import { DropTableAST } from '../parser/ast/ddl/drop-table.ast.js';
 import { InsertAST } from '../parser/ast/dml/insert.ast.js';
+import { SelectAST } from '../parser/ast/select.class.js';
+import { UpdateAST } from '../parser/ast/dml/update.ast.js';
+import { DeleteAST } from '../parser/ast/dml/delete.ast.js';
+import { TableManager } from '../../storage/table-manager/table-manager.js';
 
 export interface ValidatorIF {
     validate(ast: MainClassAST): Promise<void>;
@@ -42,18 +46,27 @@ export class Validator implements ValidatorIF {
                 await this.insertValidator.validate(ast as InsertAST);
                 break;
             case DMLType.SELECT:
-                await this.selectValidator.validate(ast);
+                await this.selectValidator.validate(ast as SelectAST);
                 break;
             case DMLType.UPDATE:
-                await this.updateValidator.validate(ast);
+                await this.updateValidator.validate(ast as UpdateAST);
                 break;
             case DMLType.DELETE:
-                await this.deleteValidator.validate(ast);
+                await this.deleteValidator.validate(ast as DeleteAST);
                 break;
             default:
                 throw new SyntaxError(
                     `Validator for AST type ${ast.type} not implemented.`,
                 );
+        }
+    }
+
+    public static async validateIsTableExists(
+        tableName: string,
+        tableManager: TableManager,
+    ): Promise<void> {
+        if (!(await tableManager.isTableExists(tableName))) {
+            throw new Error(`Table ${tableName} does not exist.`);
         }
     }
 }

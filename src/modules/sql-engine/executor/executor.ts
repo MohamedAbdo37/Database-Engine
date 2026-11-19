@@ -66,36 +66,6 @@ export class Executor {
         }
     }
 
-    private async executeInsert(ast: InsertAST): Promise<void> {}
-
-    private getDatatypeInstance(
-        datatype: DatatypeEnum,
-        size: number,
-        value?: any,
-        isNull?: boolean,
-    ): Datatype<any> {
-        switch (datatype) {
-            case DatatypeEnum.SERIAL:
-                return new SERIAL(value ?? 1, isNull);
-            case DatatypeEnum.INT:
-                return new INT(value ?? 0, isNull);
-            case DatatypeEnum.DOUBLE:
-                return new DOUBLE(value ?? 0, isNull);
-            case DatatypeEnum.VARCHAR:
-                return new VARCHAR(value ?? '', size, isNull);
-            case DatatypeEnum.BOOLEAN:
-                return new BOOLEAN(value ?? false, isNull);
-            case DatatypeEnum.TIMESTAMP:
-                return new TIMESTAMP(value ?? new Date(0), isNull);
-            case DatatypeEnum.DATETIME:
-                return new DATETIME(value ?? new Date(0), isNull);
-            case DatatypeEnum.CHAR:
-                return new CHAR(value ?? '', size, isNull);
-            default:
-                throw new Error(`Unsupported datatype: ${datatype}`);
-        }
-    }
-
     private async executeUpdate(ast: UpdateAST): Promise<void> {
         let rightOperandValue: any;
         let leftOperandValue: any;
@@ -103,51 +73,11 @@ export class Executor {
         const schema = await this.tableManager.getTableSchema(ast.tableName);
 
         if (ast.whereCondition.isRightOperandColumn) {
-            const schemaColumn = schema.columns.find(
-                (col) => col.name === ast.whereCondition.rightOperand,
-            );
-
-            if (!schemaColumn) {
-                throw new ExecutionErrorException(
-                    `Column '${ast.whereCondition.rightOperand}' does not exist in table '${ast.tableName}'.`,
-                );
-            }
-
-            const column: Column = {
-                name: schemaColumn.name,
-                datatype: this.getDatatypeInstance(
-                    schemaColumn?.datatype,
-                    schemaColumn.value,
-                ),
-                id: schemaColumn.id,
-                isPrimary: schemaColumn.isPrimary,
-            };
-
-            rightOperandValue = column;
+            rightOperandValue = ast.whereCondition.rightOperand as Column;
         } else rightOperandValue = ast.whereCondition.rightOperand;
 
         if (ast.whereCondition.isLeftOperandColumn) {
-            const schemaColumn = schema.columns.find(
-                (col) => col.name === ast.whereCondition.leftOperand,
-            );
-
-            if (!schemaColumn) {
-                throw new ExecutionErrorException(
-                    `Column '${ast.whereCondition.leftOperand}' does not exist in table '${ast.tableName}'.`,
-                );
-            }
-
-            const column: Column = {
-                name: schemaColumn.name,
-                datatype: this.getDatatypeInstance(
-                    schemaColumn?.datatype,
-                    schemaColumn.value,
-                ),
-                id: schemaColumn.id,
-                isPrimary: schemaColumn.isPrimary,
-            };
-
-            leftOperandValue = column;
+            leftOperandValue = ast.whereCondition.leftOperand as Column;
         } else leftOperandValue = ast.whereCondition.leftOperand;
 
         const table: Table = await this.tableManager.scanTable(ast.tableName);
@@ -161,26 +91,14 @@ export class Executor {
 
         for (const row of filteredTable.rows) {
             for (const columnAssignment of ast.columns) {
-                const schemaColumn = schema.columns.find(
-                    (col) => col.name === columnAssignment.column,
+                const schemaColumn = schema.getColumnByName(
+                    columnAssignment.column,
                 );
 
-                if (!schemaColumn) {
-                    throw new ExecutionErrorException(
-                        `Column '${columnAssignment.column}' does not exist in table '${ast.tableName}'.`,
-                    );
-                }
-
-                if (columnAssignment.isNull && !schemaColumn.isNullable) {
-                    throw new ExecutionErrorException(
-                        `Column '${columnAssignment.column}' cannot be null in table '${ast.tableName}'.`,
-                    );
-                }
-
                 try {
-                    row.data[schemaColumn.id] = this.getDatatypeInstance(
-                        schemaColumn.datatype,
-                        schemaColumn.value,
+                    row.data[schemaColumn!.id] = Datatype.getDatatypeInstance(
+                        schemaColumn!.datatype,
+                        schemaColumn!.value,
                         columnAssignment.value,
                         columnAssignment.isNull,
                     );
@@ -237,12 +155,13 @@ export class Executor {
 
             const column: Column = {
                 name: schemaColumn.name,
-                datatype: this.getDatatypeInstance(
+                datatype: Datatype.getDatatypeInstance(
                     schemaColumn?.datatype,
                     schemaColumn.value,
                 ),
                 id: schemaColumn.id,
                 isPrimary: schemaColumn.isPrimary,
+                isUnique: schemaColumn.isUnique,
             };
 
             rightOperandValue = column;
@@ -261,12 +180,13 @@ export class Executor {
 
             const column: Column = {
                 name: schemaColumn.name,
-                datatype: this.getDatatypeInstance(
+                datatype: Datatype.getDatatypeInstance(
                     schemaColumn?.datatype,
                     schemaColumn.value,
                 ),
                 id: schemaColumn.id,
                 isPrimary: schemaColumn.isPrimary,
+                isUnique: schemaColumn.isUnique,
             };
 
             leftOperandValue = column;

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ValidatorIF } from '../validator.js';
+import { Validator, ValidatorIF } from '../validator.js';
 import { TableManager } from '../../../storage/table-manager/table-manager.js';
 import { InsertAST, InsertColumn } from '../../parser/ast/dml/insert.ast.js';
 import { Catalog, CatalogColumn } from '../../../storage/dto/catalog.dto.js';
@@ -11,11 +11,7 @@ export class InsertValidator implements ValidatorIF {
     constructor(private readonly tableManager: TableManager) {}
 
     public async validate(ast: InsertAST): Promise<void> {
-        if (!(await this.tableManager.isTableExists(ast.tableName))) {
-            throw new ExecutionErrorException(
-                `Table '${ast.tableName}' does not exist. Cannot perform insert operation.`,
-            );
-        }
+        Validator.validateIsTableExists(ast.tableName, this.tableManager);
 
         const tableSchema = await this.tableManager.getTableSchema(
             ast.tableName,

@@ -54,6 +54,34 @@ export abstract class Datatype<T> {
             this.value === other.value
         );
     }
+
+    public static getDatatypeInstance(
+        datatype: DatatypeEnum,
+        size: number,
+        value?: any,
+        isNull?: boolean,
+    ): Datatype<any> {
+        switch (datatype) {
+            case DatatypeEnum.SERIAL:
+                return new SERIAL(value ?? 1, isNull);
+            case DatatypeEnum.INT:
+                return new INT(value ?? 0, isNull);
+            case DatatypeEnum.DOUBLE:
+                return new DOUBLE(value ?? 0, isNull);
+            case DatatypeEnum.VARCHAR:
+                return new VARCHAR(value ?? '', size, isNull);
+            case DatatypeEnum.BOOLEAN:
+                return new BOOLEAN(value ?? false, isNull);
+            case DatatypeEnum.TIMESTAMP:
+                return new TIMESTAMP(value ?? new Date(0), isNull);
+            case DatatypeEnum.DATETIME:
+                return new DATETIME(value ?? new Date(0), isNull);
+            case DatatypeEnum.CHAR:
+                return new CHAR(value ?? '', size, isNull);
+            default:
+                throw new Error(`Unsupported datatype: ${datatype}`);
+        }
+    }
 }
 
 export class SERIAL extends Datatype<number> {
@@ -71,7 +99,7 @@ export class SERIAL extends Datatype<number> {
                 'Value must be a non-negative integer for SERIAL type',
             );
         }
-        this._value = val.toFixed(0) as unknown as number;
+        this._value = Math.trunc(val);
         this.isNull = false;
     }
 
@@ -121,7 +149,7 @@ export class INT extends Datatype<number> {
             throw new DatatypeException(
                 `Value ${val} exceeds the maximum safe integer limit for INT type`,
             );
-        this._value = val.toFixed(0) as unknown as number;
+        this._value = Math.trunc(val);
         this.isNull = false;
     }
     public serialize(): Buffer {
