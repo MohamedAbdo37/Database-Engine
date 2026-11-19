@@ -32,6 +32,7 @@ import { Column, Table } from '../../storage/table-manager/table.dto.js';
 import { DeleteAST } from '../parser/ast/dml/delete.ast.js';
 import { SelectAST, SelectClause } from '../parser/ast/select.class.js';
 import { CreateExecutor } from './executors/create.executor.js';
+import { DropExecutor } from './executors/drop.executor.js';
 
 export interface ExecutorIF {
     execute(ast: MainClassAST): Promise<void>;
@@ -42,6 +43,7 @@ export class Executor {
     constructor(
         private readonly tableManager: TableManager,
         private readonly createExecutor: CreateExecutor,
+        private readonly dropExecutor: DropExecutor,
     ) {}
 
     public async execute(ast: MainClassAST): Promise<void> {
@@ -50,7 +52,7 @@ export class Executor {
                 await this.createExecutor.execute(ast as CreateTableAST);
                 break;
             case DDLType.DROP_TABLE:
-                await this.executeDropTable(ast as DropTableAST);
+                await this.dropExecutor.execute(ast as DropTableAST);
                 break;
             case DDLType.ALTER_TABLE:
                 // Implement alter table logic here
@@ -70,10 +72,6 @@ export class Executor {
             default:
                 throw new Error(`Unsupported AST type: ${ast.type}`);
         }
-    }
-
-    private async executeDropTable(ast: DropTableAST): Promise<void> {
-        await this.tableManager.dropTable(ast.tableName);
     }
 
     private async executeInsert(ast: InsertAST): Promise<void> {
