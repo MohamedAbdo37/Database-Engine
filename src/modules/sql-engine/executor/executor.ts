@@ -5,18 +5,7 @@ import { CreateTableAST } from '../parser/ast/ddl/create-table.ast.js';
 import { ExecutionErrorException } from '../exceptions/execution-error.exc.js';
 import { DropTableAST } from '../parser/ast/ddl/drop-table.ast.js';
 import { InsertAST } from '../parser/ast/dml/insert.ast.js';
-import {
-    BOOLEAN,
-    CHAR,
-    Datatype,
-    DatatypeEnum,
-    DATETIME,
-    DOUBLE,
-    INT,
-    SERIAL,
-    TIMESTAMP,
-    VARCHAR,
-} from '../../storage/dto/datatype.dto.js';
+import { Datatype } from '../../storage/dto/datatype.dto.js';
 import { UpdateAST } from '../parser/ast/dml/update.ast.js';
 import { Column, Table } from '../../storage/table-manager/table.dto.js';
 import { DeleteAST } from '../parser/ast/dml/delete.ast.js';
@@ -24,6 +13,7 @@ import { SelectAST, SelectClause } from '../parser/ast/select.class.js';
 import { CreateExecutor } from './executors/create.executor.js';
 import { DropExecutor } from './executors/drop.executor.js';
 import { InsertExecutor } from './executors/insert.executor.js';
+import { UpdateExecutor } from './executors/update.executor.js';
 
 export interface ExecutorIF {
     execute(ast: MainClassAST): Promise<void>;
@@ -36,6 +26,7 @@ export class Executor {
         private readonly createExecutor: CreateExecutor,
         private readonly dropExecutor: DropExecutor,
         private readonly insertExecutor: InsertExecutor,
+        private readonly updateExecutor: UpdateExecutor,
     ) {}
 
     public async execute(ast: MainClassAST): Promise<void> {
@@ -56,7 +47,7 @@ export class Executor {
                 await this.executeSelect(ast as SelectAST);
                 break;
             case DMLType.UPDATE:
-                await this.executeUpdate(ast as UpdateAST);
+                await this.updateExecutor.execute(ast as UpdateAST);
                 break;
             case DMLType.DELETE:
                 await this.executeDelete(ast as DeleteAST);
@@ -64,57 +55,6 @@ export class Executor {
             default:
                 throw new Error(`Unsupported AST type: ${ast.type}`);
         }
-    }
-
-    private async executeUpdate(ast: UpdateAST): Promise<void> {
-        let rightOperandValue: any;
-        let leftOperandValue: any;
-
-        const schema = await this.tableManager.getTableSchema(ast.tableName);
-
-        if (ast.whereCondition.isRightOperandColumn) {
-            rightOperandValue = ast.whereCondition.rightOperand as Column;
-        } else rightOperandValue = ast.whereCondition.rightOperand;
-
-        if (ast.whereCondition.isLeftOperandColumn) {
-            leftOperandValue = ast.whereCondition.leftOperand as Column;
-        } else leftOperandValue = ast.whereCondition.leftOperand;
-
-        const table: Table = await this.tableManager.scanTable(ast.tableName);
-
-        const filteredTable: Table = this.tableManager.whereEvaluate(
-            table,
-            ast.whereCondition.operator,
-            rightOperandValue,
-            leftOperandValue,
-        );
-
-        for (const row of filteredTable.rows) {
-            for (const columnAssignment of ast.columns) {
-                const schemaColumn = schema.getColumnByName(
-                    columnAssignment.column,
-                );
-
-                try {
-                    row.data[schemaColumn!.id] = Datatype.getDatatypeInstance(
-                        schemaColumn!.datatype,
-                        schemaColumn!.value,
-                        columnAssignment.value,
-                        columnAssignment.isNull,
-                    );
-                } catch (error: any) {
-                    throw new ExecutionErrorException(
-                        `Invalid value for column '${columnAssignment.column}': ${error.message}`,
-                    );
-                }
-            }
-        }
-
-        await this.tableManager.updateRecords(
-            ast.tableName,
-            await this.tableManager.getCatalogSchemaRecord(ast.tableName),
-            filteredTable.rows,
-        );
     }
 
     private async executeDelete(ast: DeleteAST): Promise<void> {
