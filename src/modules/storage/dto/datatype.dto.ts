@@ -71,7 +71,7 @@ export class SERIAL extends Datatype<number> {
                 'Value must be a non-negative integer for SERIAL type',
             );
         }
-        this._value = val;
+        this._value = val.toFixed(0) as unknown as number;
         this.isNull = false;
     }
 
@@ -121,7 +121,7 @@ export class INT extends Datatype<number> {
             throw new DatatypeException(
                 `Value ${val} exceeds the maximum safe integer limit for INT type`,
             );
-        this._value = val;
+        this._value = val.toFixed(0) as unknown as number;
         this.isNull = false;
     }
     public serialize(): Buffer {

@@ -46,8 +46,8 @@ export class CatalogColumn {
             this.isUnique = true;
             this.isNullable = false;
         }
-        this.value = value || -1;
-        this.defaultValue = value ?? null;
+        this.value = value ?? -1;
+        this.defaultValue = defaultValue ?? null;
     }
 
     public getColumnDatatypeObject(): Datatype<any> {
@@ -150,6 +150,10 @@ export class Catalog implements DBObjects {
     columns: CatalogColumn[];
 
     indexes: CatalogIndex[];
+
+    public get columnsName(): string[] {
+        return this.columns.map((column) => column.name);
+    }
 
     public getColumnByName(name: string): CatalogColumn | undefined {
         return this.columns.find((column) => column.name === name);
