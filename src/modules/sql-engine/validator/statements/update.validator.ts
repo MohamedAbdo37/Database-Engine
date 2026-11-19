@@ -6,13 +6,14 @@ import { ExecutionErrorException } from '../../exceptions/execution-error.exc.js
 import { Catalog } from '../../../storage/dto/catalog.dto.js';
 import { Column } from '../../../storage/table-manager/table.dto.js';
 import { Datatype } from '../../../storage/dto/datatype.dto.js';
+import { WhereCondition } from '../../parser/ast/dml/dml.class.js';
 
 @Injectable()
 export class UpdateValidator implements ValidatorIF {
     constructor(private readonly tableManager: TableManager) {}
 
     public async validate(ast: UpdateAST): Promise<void> {
-        Validator.validateIsTableExists(ast.tableName, this.tableManager);
+        await Validator.validateIsTableExists(ast.tableName, this.tableManager);
 
         const schema = await this.tableManager.getTableSchema(ast.tableName);
 
@@ -41,52 +42,17 @@ export class UpdateValidator implements ValidatorIF {
         }
 
         if (ast.whereCondition.isLeftOperandColumn)
-            ast.whereCondition.leftOperand = this.validateWhereOperandAsColumn(
-                ast.whereCondition.leftOperand,
-                schema,
-            );
+            ast.whereCondition.leftOperand =
+                WhereCondition.validateWhereOperandAsColumn(
+                    ast.whereCondition.leftOperand,
+                    schema,
+                );
 
         if (ast.whereCondition.isRightOperandColumn)
-            ast.whereCondition.rightOperand = this.validateWhereOperandAsColumn(
-                ast.whereCondition.rightOperand,
-                schema,
-            );
-    }
-
-    private validateWhereOperandAsColumn(
-        operand: string | number | null | Column,
-        schema: Catalog,
-    ): Column {
-        if (operand === null) {
-            throw new ExecutionErrorException(
-                'Operand cannot be null when it is expected to be a column name.',
-            );
-        }
-
-        if (typeof operand !== 'string') {
-            throw new ExecutionErrorException(
-                `Expected a column name as a string, but got ${typeof operand}.`,
-            );
-        }
-
-        const column = schema.getColumnByName(operand as string);
-        if (!column) {
-            throw new ExecutionErrorException(
-                `Column ${operand} does not exist in table ${schema.tableName}.`,
-            );
-        }
-
-        operand = {
-            name: column.name,
-            datatype: Datatype.getDatatypeInstance(
-                column?.datatype,
-                column.value,
-            ),
-            id: column.id,
-            isPrimary: column.isPrimary,
-            isUnique: column.isUnique,
-        };
-
-        return operand;
+            ast.whereCondition.rightOperand =
+                WhereCondition.validateWhereOperandAsColumn(
+                    ast.whereCondition.rightOperand,
+                    schema,
+                );
     }
 }

@@ -11,7 +11,7 @@ export class InsertValidator implements ValidatorIF {
     constructor(private readonly tableManager: TableManager) {}
 
     public async validate(ast: InsertAST): Promise<void> {
-        Validator.validateIsTableExists(ast.tableName, this.tableManager);
+        await Validator.validateIsTableExists(ast.tableName, this.tableManager);
 
         const tableSchema = await this.tableManager.getTableSchema(
             ast.tableName,

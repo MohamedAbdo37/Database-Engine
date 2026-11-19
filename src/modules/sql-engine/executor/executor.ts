@@ -5,15 +5,15 @@ import { CreateTableAST } from '../parser/ast/ddl/create-table.ast.js';
 import { ExecutionErrorException } from '../exceptions/execution-error.exc.js';
 import { DropTableAST } from '../parser/ast/ddl/drop-table.ast.js';
 import { InsertAST } from '../parser/ast/dml/insert.ast.js';
-import { Datatype } from '../../storage/dto/datatype.dto.js';
 import { UpdateAST } from '../parser/ast/dml/update.ast.js';
-import { Column, Table } from '../../storage/table-manager/table.dto.js';
+import { Table } from '../../storage/table-manager/table.dto.js';
 import { DeleteAST } from '../parser/ast/dml/delete.ast.js';
 import { SelectAST, SelectClause } from '../parser/ast/select.class.js';
 import { CreateExecutor } from './executors/create.executor.js';
 import { DropExecutor } from './executors/drop.executor.js';
 import { InsertExecutor } from './executors/insert.executor.js';
 import { UpdateExecutor } from './executors/update.executor.js';
+import { DeleteExecutor } from './executors/delete.executor.js';
 
 export interface ExecutorIF {
     execute(ast: MainClassAST): Promise<void>;
@@ -27,6 +27,7 @@ export class Executor {
         private readonly dropExecutor: DropExecutor,
         private readonly insertExecutor: InsertExecutor,
         private readonly updateExecutor: UpdateExecutor,
+        private readonly deleteExecutor: DeleteExecutor,
     ) {}
 
     public async execute(ast: MainClassAST): Promise<void> {
@@ -50,99 +51,11 @@ export class Executor {
                 await this.updateExecutor.execute(ast as UpdateAST);
                 break;
             case DMLType.DELETE:
-                await this.executeDelete(ast as DeleteAST);
+                await this.deleteExecutor.execute(ast as DeleteAST);
                 break;
             default:
                 throw new Error(`Unsupported AST type: ${ast.type}`);
         }
-    }
-
-    private async executeDelete(ast: DeleteAST): Promise<void> {
-        const isTableExists = await this.tableManager.isTableExists(
-            ast.tableName,
-        );
-
-        if (!isTableExists) {
-            throw new ExecutionErrorException(
-                `Table '${ast.tableName}' does not exist. Cannot perform delete operation.`,
-            );
-        }
-
-        const table: Table = await this.tableManager.scanTable(ast.tableName);
-
-        if (!ast.whereCondition) {
-            await this.tableManager.deleteRecords(ast.tableName, table.rows);
-            return;
-        }
-
-        let filteredTable: Table;
-
-        let rightOperandValue: any;
-        let leftOperandValue: any;
-
-        const schema = await this.tableManager.getTableSchema(ast.tableName);
-
-        if (ast.whereCondition.isRightOperandColumn) {
-            const schemaColumn = schema.columns.find(
-                (col) => col.name === ast.whereCondition!.rightOperand,
-            );
-
-            if (!schemaColumn) {
-                throw new ExecutionErrorException(
-                    `Column '${ast.whereCondition.rightOperand}' does not exist in table '${ast.tableName}'.`,
-                );
-            }
-
-            const column: Column = {
-                name: schemaColumn.name,
-                datatype: Datatype.getDatatypeInstance(
-                    schemaColumn?.datatype,
-                    schemaColumn.value,
-                ),
-                id: schemaColumn.id,
-                isPrimary: schemaColumn.isPrimary,
-                isUnique: schemaColumn.isUnique,
-            };
-
-            rightOperandValue = column;
-        } else rightOperandValue = ast.whereCondition.rightOperand;
-
-        if (ast.whereCondition.isLeftOperandColumn) {
-            const schemaColumn = schema.columns.find(
-                (col) => col.name === ast.whereCondition!.leftOperand,
-            );
-
-            if (!schemaColumn) {
-                throw new ExecutionErrorException(
-                    `Column '${ast.whereCondition.leftOperand}' does not exist in table '${ast.tableName}'.`,
-                );
-            }
-
-            const column: Column = {
-                name: schemaColumn.name,
-                datatype: Datatype.getDatatypeInstance(
-                    schemaColumn?.datatype,
-                    schemaColumn.value,
-                ),
-                id: schemaColumn.id,
-                isPrimary: schemaColumn.isPrimary,
-                isUnique: schemaColumn.isUnique,
-            };
-
-            leftOperandValue = column;
-        } else leftOperandValue = ast.whereCondition.leftOperand;
-
-        filteredTable = this.tableManager.whereEvaluate(
-            table,
-            ast.whereCondition.operator,
-            rightOperandValue,
-            leftOperandValue,
-        );
-
-        await this.tableManager.deleteRecords(
-            ast.tableName,
-            filteredTable.rows,
-        );
     }
 
     private async executeSelect(ast: SelectAST): Promise<void> {
