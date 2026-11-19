@@ -8,6 +8,8 @@ import { InsertValidator } from './statements/insert.validator.js';
 import { SelectValidator } from './statements/select.validator.js';
 import { UpdateValidator } from './statements/update.validator.js';
 import { DeleteValidator } from './statements/delete.validator.js';
+import { DropTableAST } from '../parser/ast/ddl/drop-table.ast.js';
+import { InsertAST } from '../parser/ast/dml/insert.ast.js';
 
 export interface ValidatorIF {
     validate(ast: MainClassAST): Promise<void>;
@@ -31,13 +33,13 @@ export class Validator implements ValidatorIF {
                 await this.createValidator.validate(ast as CreateTableAST);
                 break;
             case DDLType.DROP_TABLE:
-                await this.dropValidator.validate(ast);
+                await this.dropValidator.validate(ast as DropTableAST);
                 break;
             case DDLType.ALTER_TABLE:
                 await this.alterValidator.validate(ast);
                 break;
             case DMLType.INSERT:
-                await this.insertValidator.validate(ast);
+                await this.insertValidator.validate(ast as InsertAST);
                 break;
             case DMLType.SELECT:
                 await this.selectValidator.validate(ast);
