@@ -17,7 +17,9 @@ import { DeleteExecutor } from './executors/delete.executor.js';
 import { SelectExecutor } from './executors/select.executor.js';
 
 export interface ExecutorIF {
-    execute(ast: MainClassAST): Promise<string | Record<string, unknown>[]>;
+    execute(
+        ast: MainClassAST,
+    ): Promise<string | Record<string, unknown>[] | Table>;
 }
 
 @Injectable()

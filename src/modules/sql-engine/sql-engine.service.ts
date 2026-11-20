@@ -36,7 +36,9 @@ export class SqlEngineService {
         return result;
     }
 
-    async executeDML(query: string): Promise<void | Table | string> {
+    async executeDML(
+        query: string,
+    ): Promise<string | Record<string, unknown>[]> {
         const tokens = this.tokenizer.tokenize(query);
         const ast = new ParserGenerator(tokens).parse() as MainClassAST;
 
@@ -47,11 +49,16 @@ export class SqlEngineService {
         }
 
         await this.validator.validate(ast as MainClassAST);
-        const table: Table | undefined =
-            (await this.executor.execute(ast as MainClassAST)) ?? undefined;
+        const result: Table | string = await this.executor.execute(
+            ast as MainClassAST,
+        );
 
         console.log(`Executed DML query: \n${query} \nsuccessfully.`);
 
-        return table;
+        if (result instanceof Table) {
+            return Table.mapTableToRows(result);
+        }
+
+        return result;
     }
 }
