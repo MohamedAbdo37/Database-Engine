@@ -9,7 +9,7 @@ import { ExecutionErrorException } from '../../exceptions/execution-error.exc.js
 @Injectable()
 export class UpdateExecutor implements ExecutorIF {
     constructor(private readonly tableManager: TableManager) {}
-    public async execute(ast: UpdateAST): Promise<void> {
+    public async execute(ast: UpdateAST): Promise<string> {
         let rightOperandValue: any;
         let leftOperandValue: any;
 
@@ -58,5 +58,7 @@ export class UpdateExecutor implements ExecutorIF {
             await this.tableManager.getCatalogSchemaRecord(ast.tableName),
             filteredTable.rows,
         );
+
+        return `Updated ${filteredTable.rows.length} records in table '${ast.tableName}'.`;
     }
 }

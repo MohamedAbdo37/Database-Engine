@@ -17,7 +17,7 @@ import { DeleteExecutor } from './executors/delete.executor.js';
 import { SelectExecutor } from './executors/select.executor.js';
 
 export interface ExecutorIF {
-    execute(ast: MainClassAST): Promise<string | Table>;
+    execute(ast: MainClassAST): Promise<string | Record<string, unknown>[]>;
 }
 
 @Injectable()
@@ -31,7 +31,7 @@ export class Executor {
         private readonly selectExecutor: SelectExecutor,
     ) {}
 
-    public async execute(ast: MainClassAST): Promise<void | Table | string> {
+    public async execute(ast: MainClassAST): Promise<Table | string> {
         switch (ast.type) {
             case DDLType.CREATE_TABLE:
                 return await this.createExecutor.execute(ast as CreateTableAST);

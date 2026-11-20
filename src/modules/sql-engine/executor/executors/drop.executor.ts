@@ -6,7 +6,8 @@ import { DropTableAST } from '../../parser/ast/ddl/drop-table.ast.js';
 @Injectable()
 export class DropExecutor implements ExecutorIF {
     constructor(private readonly tableManager: TableManager) {}
-    public async execute(ast: DropTableAST): Promise<void> {
+    public async execute(ast: DropTableAST): Promise<string> {
         await this.tableManager.dropTable(ast.tableName);
+        return `Table '${ast.tableName}' dropped successfully.`;
     }
 }

@@ -7,12 +7,12 @@ import { Column, Table } from '../../../storage/table-manager/table.dto.js';
 @Injectable()
 export class DeleteExecutor implements ExecutorIF {
     constructor(private readonly tableManager: TableManager) {}
-    public async execute(ast: DeleteAST): Promise<void> {
+    public async execute(ast: DeleteAST): Promise<string> {
         const table: Table = await this.tableManager.scanTable(ast.tableName);
 
         if (!ast.whereCondition) {
             await this.tableManager.deleteRecords(ast.tableName, table.rows);
-            return;
+            return `Deleted ${table.rows.length} records from table '${ast.tableName}'.`;
         }
 
         let filteredTable: Table;
@@ -39,5 +39,7 @@ export class DeleteExecutor implements ExecutorIF {
             ast.tableName,
             filteredTable.rows,
         );
+
+        return `Deleted ${filteredTable.rows.length} records from table '${ast.tableName}'.`;
     }
 }

@@ -14,7 +14,7 @@ import { ColumnConstraintEnum } from '../../parser/ast/ddl/column-definition.ast
 export class CreateExecutor implements ExecutorIF {
     constructor(private readonly tableManager: TableManager) {}
 
-    public async execute(ast: CreateTableAST): Promise<void> {
+    public async execute(ast: CreateTableAST): Promise<string> {
         const catalogColumns: CatalogColumn[] = [];
         for (const [id, columnDef] of ast.columns.entries()) {
             const columnValue =
@@ -58,5 +58,7 @@ export class CreateExecutor implements ExecutorIF {
             catalogIndexes,
         );
         await this.tableManager.createTable(catalog);
+
+        return `Table '${ast.tableName}' created successfully.`;
     }
 }

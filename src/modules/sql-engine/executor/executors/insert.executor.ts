@@ -13,21 +13,19 @@ import { Datatype, DatatypeEnum } from '../../../storage/dto/datatype.dto.js';
 export class InsertExecutor implements ExecutorIF {
     constructor(private readonly tableManager: TableManager) {}
 
-    public async execute(ast: InsertAST): Promise<void> {
+    public async execute(ast: InsertAST): Promise<string> {
         const [tableSchema, recordSchema] = await Promise.all([
             this.tableManager.getTableSchema(ast.tableName),
             this.tableManager.getCatalogSchemaRecord(ast.tableName),
         ]);
 
         const records = ast.rows.map((row) =>
-            this.createInsertRecord(
-                row,
-                tableSchema,
-                recordSchema,
-            ),
+            this.createInsertRecord(row, tableSchema, recordSchema),
         );
 
         await this.tableManager.insertRecords(ast.tableName, records);
+
+        return `Inserted ${records.length} records into table '${ast.tableName}'.`;
     }
 
     private createInsertRecord(
