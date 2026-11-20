@@ -4,6 +4,7 @@ import {
     BOOLEAN,
     CHAR,
     Datatype,
+    DatatypeEnum,
     DATETIME,
     DOUBLE,
     INT,
@@ -747,5 +748,201 @@ describe('Null datatype serialization and deserialization', () => {
         expect(deserialized[3].value).toBe(3.14);
         expect(deserialized[5].value).toBe(123);
         expect(deserialized[7].value).toEqual(new Date('2024-01-01T00:00:00Z'));
+    });
+});
+
+describe('Datatype getDatatypeInstance', () => {
+    it('should create CHAR values with CHAR serialization semantics', () => {
+        const getDatatypeInstance = Reflect.get(
+            Datatype,
+            'getDatatypeInstance',
+        ) as (
+            datatype: unknown,
+            size: number,
+            value?: unknown,
+            isNull?: boolean,
+        ) => CHAR;
+
+        const datatype = getDatatypeInstance.call(
+            Datatype,
+            DatatypeEnum.CHAR,
+            20,
+            'John Doe',
+        );
+
+        expect(datatype).toBeInstanceOf(CHAR);
+        expect(new CHAR('', 20).deserialize(datatype.serialize()).value).toBe(
+            'John Doe',
+        );
+    });
+
+    it('should create VARCHAR values with VARCHAR serialization semantics', () => {
+        const getDatatypeInstance = Reflect.get(
+            Datatype,
+            'getDatatypeInstance',
+        ) as (
+            datatype: unknown,
+            size: number,
+            value?: unknown,
+            isNull?: boolean,
+        ) => VARCHAR;
+
+        const datatype = getDatatypeInstance.call(
+            Datatype,
+            DatatypeEnum.VARCHAR,
+            20,
+            'John Doe',
+        );
+
+        expect(datatype).toBeInstanceOf(VARCHAR);
+        expect(
+            new VARCHAR('', 20).deserialize(datatype.serialize()).value,
+        ).toBe('John Doe');
+    });
+
+    it('should create INT values with INT serialization semantics', () => {
+        const getDatatypeInstance = Reflect.get(
+            Datatype,
+            'getDatatypeInstance',
+        ) as (
+            datatype: unknown,
+            size: number,
+            value?: unknown,
+            isNull?: boolean,
+        ) => INT;
+
+        const datatype = getDatatypeInstance.call(
+            Datatype,
+            DatatypeEnum.INT,
+            0,
+            42,
+        );
+
+        expect(datatype).toBeInstanceOf(INT);
+        expect(new INT(0).deserialize(datatype.serialize()).value).toBe(42);
+    });
+
+    it('should create DOUBLE values with DOUBLE serialization semantics', () => {
+        const getDatatypeInstance = Reflect.get(
+            Datatype,
+            'getDatatypeInstance',
+        ) as (
+            datatype: unknown,
+            size: number,
+            value?: unknown,
+            isNull?: boolean,
+        ) => DOUBLE;
+
+        const datatype = getDatatypeInstance.call(
+            Datatype,
+            DatatypeEnum.DOUBLE,
+            0,
+            3.14,
+        );
+
+        expect(datatype).toBeInstanceOf(DOUBLE);
+        expect(new DOUBLE(0).deserialize(datatype.serialize()).value).toBe(
+            3.14,
+        );
+    });
+
+    it('should create BOOLEAN values with BOOLEAN serialization semantics', () => {
+        const getDatatypeInstance = Reflect.get(
+            Datatype,
+            'getDatatypeInstance',
+        ) as (
+            datatype: unknown,
+            size: number,
+            value?: unknown,
+            isNull?: boolean,
+        ) => BOOLEAN;
+
+        const datatype = getDatatypeInstance.call(
+            Datatype,
+            DatatypeEnum.BOOLEAN,
+            0,
+            true,
+        );
+
+        expect(datatype).toBeInstanceOf(BOOLEAN);
+        expect(new BOOLEAN(false).deserialize(datatype.serialize()).value).toBe(
+            true,
+        );
+    });
+
+    it('should create TIMESTAMP values with TIMESTAMP serialization semantics', () => {
+        const getDatatypeInstance = Reflect.get(
+            Datatype,
+            'getDatatypeInstance',
+        ) as (
+            datatype: unknown,
+            size: number,
+            value?: unknown,
+            isNull?: boolean,
+        ) => TIMESTAMP;
+
+        const timestamp = new Date();
+        const datatype = getDatatypeInstance.call(
+            Datatype,
+            DatatypeEnum.TIMESTAMP,
+            0,
+            timestamp,
+        );
+
+        expect(datatype).toBeInstanceOf(TIMESTAMP);
+        expect(
+            new TIMESTAMP(new Date(0))
+                .deserialize(datatype.serialize())
+                .value.getTime(),
+        ).toBe(timestamp.getTime());
+    });
+
+    it('should create DATETIME values with DATETIME serialization semantics', () => {
+        const getDatatypeInstance = Reflect.get(
+            Datatype,
+            'getDatatypeInstance',
+        ) as (
+            datatype: unknown,
+            size: number,
+            value?: unknown,
+            isNull?: boolean,
+        ) => DATETIME;
+
+        const datetime = new Date();
+        const datatype = getDatatypeInstance.call(
+            Datatype,
+            DatatypeEnum.DATETIME,
+            0,
+            datetime,
+        );
+
+        expect(datatype).toBeInstanceOf(DATETIME);
+        expect(
+            new DATETIME(new Date(0))
+                .deserialize(datatype.serialize())
+                .value.getTime(),
+        ).toBe(datetime.getTime());
+    });
+
+    it('should create SERIAL values with SERIAL serialization semantics', () => {
+        const getDatatypeInstance = Reflect.get(
+            Datatype,
+            'getDatatypeInstance',
+        ) as (
+            datatype: unknown,
+            size: number,
+            value?: unknown,
+            isNull?: boolean,
+        ) => SERIAL;
+
+        const datatype = getDatatypeInstance.call(
+            Datatype,
+            DatatypeEnum.SERIAL,
+            0,
+            123,
+        );
+
+        expect(datatype).toBeInstanceOf(SERIAL);
+        expect(new SERIAL(0).deserialize(datatype.serialize()).value).toBe(123);
     });
 });

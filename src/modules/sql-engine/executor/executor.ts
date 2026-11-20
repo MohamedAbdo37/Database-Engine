@@ -14,81 +14,41 @@ import { DropExecutor } from './executors/drop.executor.js';
 import { InsertExecutor } from './executors/insert.executor.js';
 import { UpdateExecutor } from './executors/update.executor.js';
 import { DeleteExecutor } from './executors/delete.executor.js';
+import { SelectExecutor } from './executors/select.executor.js';
 
 export interface ExecutorIF {
-    execute(ast: MainClassAST): Promise<void>;
+    execute(ast: MainClassAST): Promise<string | Table>;
 }
 
 @Injectable()
 export class Executor {
     constructor(
-        private readonly tableManager: TableManager,
         private readonly createExecutor: CreateExecutor,
         private readonly dropExecutor: DropExecutor,
         private readonly insertExecutor: InsertExecutor,
         private readonly updateExecutor: UpdateExecutor,
         private readonly deleteExecutor: DeleteExecutor,
+        private readonly selectExecutor: SelectExecutor,
     ) {}
 
-    public async execute(ast: MainClassAST): Promise<void> {
+    public async execute(ast: MainClassAST): Promise<void | Table | string> {
         switch (ast.type) {
             case DDLType.CREATE_TABLE:
-                await this.createExecutor.execute(ast as CreateTableAST);
-                break;
+                return await this.createExecutor.execute(ast as CreateTableAST);
             case DDLType.DROP_TABLE:
-                await this.dropExecutor.execute(ast as DropTableAST);
-                break;
+                return await this.dropExecutor.execute(ast as DropTableAST);
             case DDLType.ALTER_TABLE:
-                // Implement alter table logic here
-                break;
+                return 'ALTER TABLE execution is not implemented yet.';
             case DMLType.INSERT:
-                await this.insertExecutor.execute(ast as InsertAST);
-                break;
+                return await this.insertExecutor.execute(ast as InsertAST);
             case DMLType.SELECT:
-                await this.executeSelect(ast as SelectAST);
-                break;
+                return await this.selectExecutor.execute(ast as SelectAST);
             case DMLType.UPDATE:
-                await this.updateExecutor.execute(ast as UpdateAST);
-                break;
+                return await this.updateExecutor.execute(ast as UpdateAST);
             case DMLType.DELETE:
-                await this.deleteExecutor.execute(ast as DeleteAST);
-                break;
+                return await this.deleteExecutor.execute(ast as DeleteAST);
             default:
                 throw new Error(`Unsupported AST type: ${ast.type}`);
         }
-    }
-
-    private async executeSelect(ast: SelectAST): Promise<void> {
-        const tables: { table: Table; alias: string }[] = [];
-
-        for (const fromClause of ast.from) {
-            let table = await this.tableManager.scanTable(fromClause.tableName);
-            if (
-                (ast.whereClause.rightColumnRef &&
-                    (ast.whereClause.rightColumnRef === fromClause.alias ||
-                        ast.whereClause.rightColumnRef ===
-                            fromClause.tableName)) ||
-                (ast.whereClause.leftColumnRef &&
-                    (ast.whereClause.leftColumnRef === fromClause.alias ||
-                        ast.whereClause.leftColumnRef === fromClause.tableName))
-            ) {
-                table = this.tableManager.whereEvaluate(
-                    table,
-                    ast.whereClause.operator,
-                    ast.whereClause.rightOperand,
-                    ast.whereClause.leftOperand,
-                );
-            }
-
-            tables.push({
-                table,
-                alias: fromClause.alias || fromClause.tableName,
-            });
-        }
-
-        // Implement the logic to fetch and display the selected data
-        // This may involve joining tables, applying where conditions, ordering, and limiting results
-        // For now, we will just log a message indicating that the SELECT operation was executed
-        console.log(`SELECT operation executed successfully.`);
     }
 }

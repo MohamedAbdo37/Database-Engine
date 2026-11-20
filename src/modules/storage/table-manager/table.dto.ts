@@ -1,3 +1,4 @@
+import { ExecutionErrorException } from '../../sql-engine/exceptions/execution-error.exc.js';
 import { Datatype } from '../dto/datatype.dto.js';
 import { RID } from '../dto/rid.dto.js';
 
@@ -164,5 +165,72 @@ export class Table {
                 return 0;
             });
         }
+    }
+
+    public renameColumns(newNames: string[]): Table {
+        if (newNames.length !== this._columns.length) {
+            throw new ExecutionErrorException(
+                `New names length (${newNames.length}) does not match number of columns (${this._columns.length})`,
+            );
+        }
+
+        this._columns.forEach((column, index) => {
+            if (newNames[index]) {
+                column.name = newNames[index];
+            }
+        });
+
+        return this;
+    }
+
+    public sortRowsByColumn(
+        columnName: string,
+        ascending: boolean = true,
+    ): void {
+        const column = this._columns.find((col) => col.name === columnName);
+        if (!column) {
+            throw new Error(
+                `Column ${columnName} does not exist in the table.`,
+            );
+        }
+
+        this._data.sort((a, b) => {
+            const aValue = a.data[column.id].value;
+            const bValue = b.data[column.id].value;
+            if (aValue < bValue) return ascending ? -1 : 1;
+            if (aValue > bValue) return ascending ? 1 : -1;
+            return 0;
+        });
+    }
+
+    public getFirstNRows(n: number): Table {
+        if (n < 0) {
+            throw new Error(
+                `Number of rows to retrieve (${n}) cannot be negative.`,
+            );
+        }
+
+        this._data = this._data.slice(0, n);
+        return this;
+    }
+
+    public static mapTableToRows<
+        T extends Record<string, unknown> = Record<string, unknown>,
+    >(table: Table, extraFields?: Partial<T>): T[] {
+        return table._data.map((row) => {
+            const mappedRow: Record<string, unknown> = {};
+
+            table._columns.forEach((col, index) => {
+                const cell = row.data[index];
+                mappedRow[col.name] = cell?.isNull
+                    ? null
+                    : (cell?.value ?? null);
+            });
+
+            return {
+                ...mappedRow,
+                ...extraFields,
+            } as T;
+        });
     }
 }

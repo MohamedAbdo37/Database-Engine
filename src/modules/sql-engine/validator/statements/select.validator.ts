@@ -79,6 +79,7 @@ export class SelectValidator implements ValidatorIF {
             this.validateWhereColumn(
                 whereClause.rightColumnRef,
                 whereClause.rightOperand,
+                true,
             );
         }
 
@@ -86,6 +87,7 @@ export class SelectValidator implements ValidatorIF {
             this.validateWhereColumn(
                 whereClause.leftColumnRef,
                 whereClause.leftOperand,
+                false,
             );
         }
     }
@@ -93,6 +95,7 @@ export class SelectValidator implements ValidatorIF {
     private validateWhereColumn(
         columnRef: string | undefined,
         operand: WhereCondition['rightOperand'],
+        isRightOperand: boolean,
     ): void {
         let table: FromClause | undefined;
 
@@ -110,12 +113,20 @@ export class SelectValidator implements ValidatorIF {
             }
         } else {
             table = this.ast.from.length === 1 ? this.ast.from[0] : undefined;
-        }
 
-        if (!table) {
-            throw new ExecutionErrorException(
-                `Column '${operand}' must be qualified when selecting from multiple tables.`,
-            );
+            if (!table) {
+                throw new ExecutionErrorException(
+                    `Column '${operand}' must be qualified when selecting from multiple tables.`,
+                );
+            }
+
+            if (isRightOperand) {
+                this.ast.whereClause.rightColumnRef =
+                    table.alias || table.tableName;
+            } else {
+                this.ast.whereClause.leftColumnRef =
+                    table.alias || table.tableName;
+            }
         }
 
         if (!table.schema?.columnsName?.includes(operand as string)) {
@@ -139,8 +150,7 @@ export class SelectValidator implements ValidatorIF {
         if (this.ast.orderByClause.column.from) {
             const table = this.ast.from.find(
                 (fromClause) =>
-                    fromClause.alias ===
-                        this.ast.orderByClause!.column.from ||
+                    fromClause.alias === this.ast.orderByClause!.column.from ||
                     fromClause.tableName ===
                         this.ast.orderByClause!.column.from,
             );
