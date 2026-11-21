@@ -273,21 +273,24 @@ export class TablePage extends Page {
         return this.data.subarray(tupleOffset, tupleOffset + tupleLength);
     }
 
-    public getAllTuples(): Buffer[] {
-        const tuples: Buffer[] = [];
-        for (const slot of this._slots) {
-            if (slot.isDeleted) continue;
+    public getAllTuples(): {
+        slotNumber: number;
+        record: Buffer;
+    }[] {
+        return this._slots.flatMap((slot, slotNumber) => {
+            if (slot.isDeleted) return [];
 
             const tupleOffset = slot.offset;
             const tupleLength = slot.length;
-            const tupleBuffer = this.data.subarray(
-                tupleOffset,
-                tupleOffset + tupleLength,
-            );
-
-            tuples.push(tupleBuffer);
-        }
-
-        return tuples;
+            return [
+                {
+                    slotNumber,
+                    record: this.data.subarray(
+                        tupleOffset,
+                        tupleOffset + tupleLength,
+                    ),
+                },
+            ];
+        });
     }
 }

@@ -66,7 +66,9 @@ describe('SQL Engine E2E Tests', () => {
         // 2. INSERT via /execute/dml
         const insertRes = await request(server)
             .post('/execute/dml')
-            .send({ query: "INSERT INTO users (id, name) VALUES (1, 'Mohamed');" })
+            .send({
+                query: "INSERT INTO users (id, name) VALUES (1, 'Mohamed');",
+            })
             .expect(200);
         assertSuccess(insertRes.body, 200);
 
@@ -129,5 +131,151 @@ describe('SQL Engine E2E Tests', () => {
             .expect(expectedStatus);
 
         assertError(errRes.body, expectedStatus);
+    });
+
+    it('auto-increments SERIAL primary/id column on inserts', async () => {
+        const server = app.getHttpServer();
+
+        // 1. Create table with a SERIAL column
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE items (id SERIAL, title VARCHAR(255));',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 2. Insert rows without specifying `id` (or if your parser expects/allows omitting SERIAL)
+        const insertFirst = await request(server)
+            .post('/execute/dml')
+            .send({ query: "INSERT INTO items (title) VALUES ('First Item');" })
+            .expect(200);
+        assertSuccess(insertFirst.body, 200);
+
+        const insertSecond = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO items (title) VALUES ('Second Item');",
+            })
+            .expect(200);
+        assertSuccess(insertSecond.body, 200);
+
+        // 3. SELECT & verify generated sequential IDs
+        const selectRes1 = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM items;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes1.body, 200);
+        expect(selectRes1.body.data).toEqual([
+            { id: 1, title: 'First Item' },
+            { id: 2, title: 'Second Item' },
+        ]);
+
+        const insertThird = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO items (title) VALUES ('Third Item');",
+            })
+            .expect(200);
+        assertSuccess(insertThird.body, 200);
+
+        const selectRes2 = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM items;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes2.body, 200);
+        expect(selectRes2.body.data).toEqual([
+            { id: 1, title: 'First Item' },
+            { id: 2, title: 'Second Item' },
+            { id: 3, title: 'Third Item' },
+        ]);
+
+        const deleteSecond = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'delete from items where id = 2;',
+            })
+            .expect(200);
+        assertSuccess(deleteSecond.body, 200);
+
+        const selectRes3 = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM items;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes3.body, 200);
+        expect(selectRes3.body.data).toEqual([
+            { id: 1, title: 'First Item' },
+            { id: 3, title: 'Third Item' },
+        ]);
+
+        const deleteThird = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'delete from items where id = 3;',
+            })
+            .expect(200);
+        assertSuccess(deleteThird.body, 200);
+
+        const selectRes4 = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM items;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes4.body, 200);
+        expect(selectRes4.body.data).toEqual([{ id: 1, title: 'First Item' }]);
+
+        const insertFourth = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO items (title) VALUES ('Fourth Item');",
+            })
+            .expect(200);
+        assertSuccess(insertFourth.body, 200);
+
+        const selectRes5 = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM items;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes5.body, 200);
+        expect(selectRes5.body.data).toEqual([
+            { id: 1, title: 'First Item' },
+            { id: 4, title: 'Fourth Item' },
+        ]);
+
+        const deleteAllRows = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'delete from items;',
+            })
+            .expect(200);
+        assertSuccess(deleteAllRows.body, 200);
+
+        const selectRes6 = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM items;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes6.body, 200);
+        expect(selectRes6.body.data).toEqual([]);
+
+        const insertFifth = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO items (title) VALUES ('Fifth Item');",
+            })
+            .expect(200);
+        assertSuccess(insertFifth.body, 200);
+
+        const selectRes7 = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM items;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes7.body, 200);
+        expect(selectRes7.body.data).toEqual([{ id: 5, title: 'Fifth Item' }]);
+
+        // 4. Clean up table
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE items;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
     });
 });

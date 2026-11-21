@@ -28,7 +28,9 @@ describe('RecordManager', () => {
         getRecord: () => Promise<Buffer | null>;
         deleteRecord: () => Promise<void>;
         updateRecord: () => Promise<RID>;
-        getPageRecords: () => Promise<Buffer[]>;
+        getPageRecords: () => Promise<
+            { slotNumber: number; record: Buffer }[]
+        >;
     };
 
     afterEach(() => {
@@ -168,13 +170,17 @@ describe('RecordManager', () => {
     it('should spy on the page manager mock passed to it for scanRecords', async () => {
         const recordManager = new RecordManager(pageManagerMock);
         const firstPageRecords = [
-            Buffer.concat([
-                new INT(1).serialize(),
-                new CHAR('A', 1).serialize(),
-            ]),
+            {
+                slotNumber: 0,
+                record: Buffer.concat([
+                    new INT(1).serialize(),
+                    new CHAR('A', 1).serialize(),
+                ]),
+            },
         ];
 
-        const secondPageRecords: Buffer[] = [];
+        const secondPageRecords: { slotNumber: number; record: Buffer }[] =
+            [];
         const getPageRecordsSpy = vi
             .spyOn(pageManagerMock, 'getPageRecords')
             .mockResolvedValueOnce(firstPageRecords)

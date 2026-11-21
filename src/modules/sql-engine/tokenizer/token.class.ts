@@ -119,7 +119,7 @@ export class KeywordToken extends Token {
 export class DatatypeToken extends Token {
     constructor(value: string = '') {
         const regex = new RegExp(
-            `^(INTEGER|INT|VARCHAR|CHAR|DATE|DOUBLE|TIMESTAMP|DATETIME)\\b`,
+            `^(INTEGER|INT|VARCHAR|CHAR|DATE|DOUBLE|TIMESTAMP|DATETIME|SERIAL)\\b`,
             'i',
         );
         super(TokenType.DATATYPE, regex);

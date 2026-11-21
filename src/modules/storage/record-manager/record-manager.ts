@@ -26,10 +26,16 @@ export class RecordManager {
     private async *pageStreamerGenerator(
         initialPageId: number,
         tableName: string,
-    ): AsyncGenerator<Buffer[], void, unknown> {
+    ): AsyncGenerator<
+        { slotNumber: number; record: Buffer }[],
+        void,
+        unknown
+    > {
         let currentPageId = initialPageId;
 
-        let fetchPage: Promise<Buffer[]> = this.pageManger.getPageRecords(
+        let fetchPage: Promise<
+            { slotNumber: number; record: Buffer }[]
+        > = this.pageManger.getPageRecords(
             tableName,
             currentPageId,
         );
@@ -247,15 +253,15 @@ export class RecordManager {
             1,
             tableName,
         )) {
-            for (const recordBuffer of pageRecords) {
+            for (const { slotNumber, record } of pageRecords) {
                 const deserializedRecord = this.deserializeRecord(
-                    recordBuffer,
+                    record,
                     schema,
                 );
                 records.push({
                     rid: {
                         pageId: page,
-                        slotNumber: records.length,
+                        slotNumber,
                     },
                     data: deserializedRecord,
                 });

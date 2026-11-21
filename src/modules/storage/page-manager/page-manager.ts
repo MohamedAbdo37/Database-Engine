@@ -383,7 +383,7 @@ export class PageManager {
     public async getPageRecords(
         tableName: string,
         pageId: number,
-    ): Promise<Buffer[]> {
+    ): Promise<{ slotNumber: number; record: Buffer }[]> {
         this.fileManger.openTableFile(tableName);
         const directory: DirectoryPage = await this.getDirectoryPage(tableName);
 
