@@ -26,3 +26,5 @@ lerna-debug.log*
 src/data/*
 .vscode/*
 coverage/*
+
+src/modules/storage/index-manager/*
