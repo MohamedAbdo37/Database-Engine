@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DDLType, DMLType, MainClassAST } from '../parser/ast/ast.class.js';
 import { CreateValidator } from './statements/create.validator.js';
 import { CreateTableAST } from '../parser/ast/ddl/create-table.ast.js';
@@ -66,7 +66,9 @@ export class Validator implements ValidatorIF {
         tableManager: TableManager,
     ): Promise<void> {
         if (!(await tableManager.isTableExists(tableName))) {
-            throw new Error(`Table '${tableName}' does not exist.`);
+            throw new NotFoundException(
+                `Table '${tableName}' does not exist.`,
+            );
         }
     }
 }

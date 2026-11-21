@@ -20,7 +20,8 @@ import { DirectoryPage, Page, PAGE_SIZE, TablePage } from '../dto/page.dto.js';
 import { PageType } from '../dto/page-type.dto.js';
 import { Injectable } from '@nestjs/common';
 
-const DATA_FOLDER = './src/data';
+const getDataFolder = (): string =>
+    process.env.DB_DATA_FOLDER ?? './src/data';
 
 @Injectable()
 export class FileManager {
@@ -50,6 +51,7 @@ export class FileManager {
     }
 
     public async initializeDataFolder(): Promise<void> {
+        const DATA_FOLDER = getDataFolder();
         await this.createFolder(DATA_FOLDER);
         await Promise.all([
             this.createFolder(`${DATA_FOLDER}/catalog`),
@@ -63,7 +65,7 @@ export class FileManager {
     }
 
     public async createTableDateFile(tableName: string): Promise<void> {
-        const dataFilePath = `./src/data/table/${tableName}.dat`;
+        const dataFilePath = `${getDataFolder()}/table/${tableName}.dat`;
         if (!existsSync(dataFilePath)) {
             await writeFile(dataFilePath, Buffer.alloc(0)).catch(
                 (error: IOException) => {
@@ -76,7 +78,7 @@ export class FileManager {
     }
 
     public async deleteTableDataFile(tableName: string): Promise<void> {
-        const filePath = `./src/data/table/${tableName}.dat`;
+        const filePath = `${getDataFolder()}/table/${tableName}.dat`;
         if (!existsSync(filePath)) return;
         try {
             await unlink(filePath);
@@ -92,9 +94,9 @@ export class FileManager {
     ): Promise<void> {
         // TODO: Implement index file creation logic based on the schema
         // For now, just create an empty index file for the table
-        const indexFilePath = `./src/data/index/${tableName}/${index.name}.idx`;
+        const indexFilePath = `${getDataFolder()}/index/${tableName}/${index.name}.idx`;
         if (!existsSync(indexFilePath)) {
-            await this.createFolder(`./src/data/index/${tableName}`);
+            await this.createFolder(`${getDataFolder()}/index/${tableName}`);
             await writeFile(indexFilePath, Buffer.alloc(0)).catch(
                 (error: IOException) => {
                     throw new IOException(
@@ -106,7 +108,7 @@ export class FileManager {
     }
 
     public async deleteIndexFile(tableName: string): Promise<void> {
-        const indexFolderPath = `./src/data/index/${tableName}`;
+        const indexFolderPath = `${getDataFolder()}/index/${tableName}`;
         if (!existsSync(indexFolderPath)) return;
         try {
             const files = await readdir(indexFolderPath);
@@ -122,12 +124,12 @@ export class FileManager {
     }
 
     public async writeCatalogSchemaFile(schema: Catalog): Promise<void> {
-        const catalogFilePath = `./src/data/catalog/${schema.tableName}.dat`;
+        const catalogFilePath = `${getDataFolder()}/catalog/${schema.tableName}.dat`;
         await this.saveObjectToFile(catalogFilePath, schema);
     }
 
     public async readCatalogSchema(tableName: string): Promise<Catalog> {
-        const filePath = `./src/data/catalog/${tableName}.dat`;
+        const filePath = `${getDataFolder()}/catalog/${tableName}.dat`;
         if (!existsSync(filePath)) {
             throw new IOException(
                 `Catalog schema file for table '${tableName}' does not exist.`,
@@ -142,7 +144,7 @@ export class FileManager {
     }
 
     public async deleteCatalogSchemaFile(tableName: string): Promise<void> {
-        const filePath = `./src/data/catalog/${tableName}.dat`;
+        const filePath = `${getDataFolder()}/catalog/${tableName}.dat`;
         if (!existsSync(filePath)) return;
         try {
             await unlink(filePath);
@@ -153,7 +155,7 @@ export class FileManager {
     }
 
     public async openTableFile(tableName: string): Promise<void> {
-        const filePath = `./src/data/table/${tableName}.dat`;
+        const filePath = `${getDataFolder()}/table/${tableName}.dat`;
         if (!existsSync(filePath)) {
             throw new IOException(
                 `Data file for table '${tableName}' does not exist.`,
