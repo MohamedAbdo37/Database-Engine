@@ -301,6 +301,36 @@ export class SelectAST extends MainClassAST {
             this.consume(); // Consume the '(' token
         }
 
+        if (
+            this.next() !== null &&
+            this.next()?.equals(new PunctuationToken('.'))
+        ) {
+            const leftColRefToken = this.peek();
+            if (
+                leftColRefToken === null ||
+                leftColRefToken.type !== TokenType.IDENTIFIER
+            ) {
+                this.missedTokenError(
+                    'Column reference identifier',
+                    leftColRefToken?.value || null,
+                    leftColRefToken?.position || null,
+                );
+            }
+            this.consume(); // Consume the left operand token
+            whereCondition.leftColumnRef = this.from.find(
+                (tbl) =>
+                    tbl.alias === leftColRefToken.value ||
+                    tbl.tableName === leftColRefToken.value,
+            )?.tableName;
+
+            if (!whereCondition.leftColumnRef) {
+                throw new SyntaxErrorException(
+                    `Column reference '${leftColRefToken.value}' does not match any table alias or name in the FROM clause at ${leftColRefToken.position}.`,
+                );
+            }
+            this.consume(); // Consume the '.' token
+        }
+
         const leftToken = this.peek();
         if (
             !leftToken ||
@@ -447,6 +477,36 @@ export class SelectAST extends MainClassAST {
         while (this.expect(new PunctuationToken('('))) {
             openPrenticesToken.push(this.peek()!);
             this.consume(); // Consume the '(' token
+        }
+
+        if (
+            this.next() !== null &&
+            this.next()?.equals(new PunctuationToken('.'))
+        ) {
+            const rightColRefToken = this.peek();
+            if (
+                rightColRefToken === null ||
+                rightColRefToken.type !== TokenType.IDENTIFIER
+            ) {
+                this.missedTokenError(
+                    'Column reference identifier',
+                    rightColRefToken?.value || null,
+                    rightColRefToken?.position || null,
+                );
+            }
+            this.consume(); // Consume the left operand token
+            whereCondition.rightColumnRef = this.from.find(
+                (tbl) =>
+                    tbl.alias === rightColRefToken.value ||
+                    tbl.tableName === rightColRefToken.value,
+            )?.tableName;
+
+            if (!whereCondition.rightColumnRef) {
+                throw new SyntaxErrorException(
+                    `Column reference '${rightColRefToken.value}' does not match any table alias or name in the FROM clause at ${rightColRefToken.position}.`,
+                );
+            }
+            this.consume(); // Consume the '.' token
         }
 
         const rightToken = this.peek();

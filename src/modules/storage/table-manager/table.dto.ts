@@ -1,5 +1,5 @@
 import { ExecutionErrorException } from '../../sql-engine/exceptions/execution-error.exc.js';
-import { Datatype } from '../dto/datatype.dto.js';
+import { Datatype, DatatypeEnum } from '../dto/datatype.dto.js';
 import { RID } from '../dto/rid.dto.js';
 
 export interface Column {
@@ -195,8 +195,13 @@ export class Table {
         }
 
         this._data.sort((a, b) => {
-            const aValue = a.data[column.id].value;
-            const bValue = b.data[column.id].value;
+            const aCell = a.data[column.id];
+            const bCell = b.data[column.id];
+            const aValue = aCell.isNull ? null : (aCell.value ?? null);
+            const bValue = bCell.isNull ? null : (bCell.value ?? null);
+            if (aValue === null && bValue === null) return 0;
+            if (aValue === null) return ascending ? 1 : -1;
+            if (bValue === null) return ascending ? -1 : 1;
             if (aValue < bValue) return ascending ? -1 : 1;
             if (aValue > bValue) return ascending ? 1 : -1;
             return 0;
@@ -222,9 +227,20 @@ export class Table {
 
             table._columns.forEach((col, index) => {
                 const cell = row.data[index];
-                mappedRow[col.name] = cell?.isNull
-                    ? null
-                    : (cell?.value ?? null);
+                if (!cell || cell.isNull) {
+                    mappedRow[col.name] = null;
+                } else if (
+                    (cell.type === DatatypeEnum.TIMESTAMP ||
+                        cell.type === DatatypeEnum.DATETIME) &&
+                    cell.value instanceof Date
+                ) {
+                    const value = cell.value;
+                    mappedRow[col.name] =
+                        `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')} ` +
+                        `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}:${String(value.getSeconds()).padStart(2, '0')}`;
+                } else {
+                    mappedRow[col.name] = cell.value ?? null;
+                }
             });
 
             return {

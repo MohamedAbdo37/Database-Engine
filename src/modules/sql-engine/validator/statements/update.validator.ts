@@ -5,7 +5,7 @@ import { UpdateAST } from '../../parser/ast/dml/update.ast.js';
 import { ExecutionErrorException } from '../../exceptions/execution-error.exc.js';
 import { Catalog } from '../../../storage/dto/catalog.dto.js';
 import { Column } from '../../../storage/table-manager/table.dto.js';
-import { Datatype } from '../../../storage/dto/datatype.dto.js';
+import { DatatypeEnum } from '../../../storage/dto/datatype.dto.js';
 import { WhereCondition } from '../../parser/ast/dml/dml.class.js';
 
 @Injectable()
@@ -37,6 +37,31 @@ export class UpdateValidator implements ValidatorIF {
             if (columnAssignment.isNull && !schemaColumn.isNullable) {
                 throw new ExecutionErrorException(
                     `Column '${columnAssignment.column}' cannot be null in table '${ast.tableName}'.`,
+                );
+            }
+
+            if (
+                !columnAssignment.isNull &&
+                (schemaColumn.datatype === DatatypeEnum.INT ||
+                    schemaColumn.datatype === DatatypeEnum.SERIAL ||
+                    schemaColumn.datatype === DatatypeEnum.DOUBLE) &&
+                typeof columnAssignment.value !== 'number'
+            ) {
+                throw new ExecutionErrorException(
+                    `Invalid value for column '${columnAssignment.column}' in table '${ast.tableName}'.`,
+                );
+            }
+
+            if (
+                !columnAssignment.isNull &&
+                (schemaColumn.datatype === DatatypeEnum.VARCHAR ||
+                    schemaColumn.datatype === DatatypeEnum.CHAR) &&
+                typeof columnAssignment.value === 'string' &&
+                schemaColumn.value >= 0 &&
+                columnAssignment.value.length > schemaColumn.value
+            ) {
+                throw new ExecutionErrorException(
+                    `Value for column '${columnAssignment.column}' exceeds the defined length ${schemaColumn.value}.`,
                 );
             }
         }

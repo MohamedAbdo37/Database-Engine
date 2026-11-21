@@ -26,6 +26,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
         if (
             exception instanceof Error &&
             (exception.name === 'SyntaxErrorException' ||
+                exception.name === 'ExecutionErrorException' ||
+                exception.name === 'DatatypeException' ||
                 exception.name === 'SyntaxError')
         ) {
             statusCode = HttpStatus.BAD_REQUEST;

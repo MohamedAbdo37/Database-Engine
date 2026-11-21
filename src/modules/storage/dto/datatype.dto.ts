@@ -388,14 +388,15 @@ export class TIMESTAMP extends Datatype<Date> {
 
         return this._value;
     }
-    public set value(val: Date) {
-        if (isNaN(val.getTime())) {
+    public set value(val: Date | string | number) {
+        const dateValue =
+            val instanceof Date ? val : new Date(val as string | number);
+        if (isNaN(dateValue.getTime())) {
             throw new DatatypeException(
                 `Invalid Date object provided for TIMESTAMP type`,
             );
         }
-
-        this._value = val;
+        this._value = dateValue;
         this.isNull = false;
     }
 
@@ -441,13 +442,25 @@ export class DATETIME extends Datatype<Date> {
 
         return this._value;
     }
-    public set value(val: Date) {
-        if (isNaN(val.getTime())) {
+    public set value(val: Date | string | number) {
+        let dateValue: Date;
+        if (val instanceof Date) {
+            dateValue = val;
+        } else if (
+            typeof val === 'string' &&
+            /^\d{4}-\d{2}-\d{2}$/.test(val)
+        ) {
+            const [year, month, day] = val.split('-').map(Number);
+            dateValue = new Date(year, month - 1, day);
+        } else {
+            dateValue = new Date(val as string | number);
+        }
+        if (isNaN(dateValue.getTime())) {
             throw new DatatypeException(
                 `Invalid Date object provided for DATETIME type`,
             );
         }
-        this._value = val;
+        this._value = dateValue;
         this.isNull = false;
     }
 

@@ -35,13 +35,38 @@ export class SelectValidator implements ValidatorIF {
 
         if (ast.selectColumns !== '*' && ast.selectColumns.length > 0) {
             for (const selectColumn of ast.selectColumns) {
-                const table = ast.from.find(
-                    (fromClause) =>
-                        fromClause.alias === selectColumn.from ||
-                        fromClause.tableName === selectColumn.from,
-                );
+                let table: FromClause | undefined;
+
+                if (selectColumn.from) {
+                    table = ast.from.find(
+                        (fromClause) =>
+                            fromClause.alias === selectColumn.from ||
+                            fromClause.tableName === selectColumn.from,
+                    );
+                } else if (ast.from.length === 1) {
+                    table = ast.from[0];
+                } else {
+                    const matchingTables = ast.from.filter((fromClause) =>
+                        fromClause.schema?.columnsName?.includes(
+                            selectColumn.name,
+                        ),
+                    );
+
+                    if (matchingTables.length === 1) {
+                        table = matchingTables[0];
+                    } else if (matchingTables.length > 1) {
+                        throw new ExecutionErrorException(
+                            `Ambiguous column '${selectColumn.name}' in the SELECT clause.`,
+                        );
+                    }
+                }
 
                 if (!table) {
+                    if (!selectColumn.from) {
+                        throw new ExecutionErrorException(
+                            `Column '${selectColumn.name}' does not exist in any FROM table.`,
+                        );
+                    }
                     throw new ExecutionErrorException(
                         `Table alias '${selectColumn.from}' does not exist in the FROM clause.`,
                     );
@@ -135,11 +160,19 @@ export class SelectValidator implements ValidatorIF {
             );
         }
 
-        this.ast.whereClause.leftOperand =
-            WhereCondition.validateWhereOperandAsColumn(
-                this.ast.whereClause.leftOperand,
-                table.schema!,
-            );
+        if (isRightOperand) {
+            this.ast.whereClause.rightOperand =
+                WhereCondition.validateWhereOperandAsColumn(
+                    this.ast.whereClause.rightOperand,
+                    table.schema!,
+                );
+        } else {
+            this.ast.whereClause.leftOperand =
+                WhereCondition.validateWhereOperandAsColumn(
+                    this.ast.whereClause.leftOperand,
+                    table.schema!,
+                );
+        }
     }
 
     private checkOrderByClause(): void {

@@ -36,7 +36,8 @@ export class TableManager {
                     'The provided table has no columns. Cannot retrieve value by index.',
                 );
             }
-            return column.getRowByIndex(index)?.data[0].value;
+            const cell = column.getRowByIndex(index)?.data[0];
+            return cell?.isNull ? null : (cell?.value ?? null);
         }
         return column;
     }

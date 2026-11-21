@@ -107,6 +107,9 @@ export class ColumnDefinition extends SubClassAST {
             case 'DATETIME':
                 this.datatype = DatatypeEnum.DATETIME;
                 break;
+            case 'DATE':
+                this.datatype = DatatypeEnum.DATETIME;
+                break;
             case 'SERIAL':
                 this.datatype = DatatypeEnum.SERIAL;
                 break;

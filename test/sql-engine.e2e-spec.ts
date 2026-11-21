@@ -278,4 +278,672 @@ describe('SQL Engine E2E Tests', () => {
             .expect(200);
         assertSuccess(dropRes.body, 200);
     });
+
+    it('supports ORDER BY (ASC/DESC) and LIMIT on SELECT queries', async () => {
+        const server = app.getHttpServer();
+
+        // 1. Create table
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE products (id INT, name VARCHAR(255), price INT);',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 2. Seed rows in non-sorted order
+        const inserts = [
+            "INSERT INTO products (id, name, price) VALUES (1, 'Keyboard', 80);",
+            "INSERT INTO products (id, name, price) VALUES (2, 'Monitor', 300);",
+            "INSERT INTO products (id, name, price) VALUES (3, 'Mouse', 40);",
+            "INSERT INTO products (id, name, price) VALUES (4, 'Laptop', 1200);",
+        ];
+
+        for (const query of inserts) {
+            const res = await request(server)
+                .post('/execute/dml')
+                .send({ query })
+                .expect(200);
+            assertSuccess(res.body, 200);
+        }
+
+        // 3. ORDER BY ASC
+        const ascRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM products ORDER BY price ASC;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(ascRes.body, 200);
+        expect(ascRes.body.data).toEqual([
+            { id: 3, name: 'Mouse', price: 40 },
+            { id: 1, name: 'Keyboard', price: 80 },
+            { id: 2, name: 'Monitor', price: 300 },
+            { id: 4, name: 'Laptop', price: 1200 },
+        ]);
+
+        // 4. ORDER BY DESC
+        const descRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM products ORDER BY price DESC;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(descRes.body, 200);
+        expect(descRes.body.data).toEqual([
+            { id: 4, name: 'Laptop', price: 1200 },
+            { id: 2, name: 'Monitor', price: 300 },
+            { id: 1, name: 'Keyboard', price: 80 },
+            { id: 3, name: 'Mouse', price: 40 },
+        ]);
+
+        // 5. ORDER BY DESC + LIMIT
+        const topTwoRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'SELECT * FROM products ORDER BY price DESC LIMIT 2;',
+            })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(topTwoRes.body, 200);
+        expect(topTwoRes.body.data).toEqual([
+            { id: 4, name: 'Laptop', price: 1200 },
+            { id: 2, name: 'Monitor', price: 300 },
+        ]);
+
+        // 6. Standalone LIMIT
+        const limitRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM products LIMIT 2;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(limitRes.body, 200);
+        expect(limitRes.body.data).toHaveLength(2);
+
+        // 7. Clean up table
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE products;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('supports SELECT with aliases, single WHERE condition, ORDER BY, and LIMIT', async () => {
+        const server = app.getHttpServer();
+
+        // 1. Create table
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE orders (id INT, customer VARCHAR(255), total INT, status VARCHAR(50));',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 2. Seed test rows
+        const inserts = [
+            `INSERT INTO orders 
+                (id, customer, total, status) 
+            VALUES 
+                (1, 'Mohamed', 250, 'paid'),
+                (2, 'Sara', 600, 'paid'),
+                (3, 'Omar', 900, 'paid'),
+                (4, 'Nadia', 1200, 'pending'),
+                (5, 'Youssef', 400, 'paid');`,
+        ];
+
+        for (const query of inserts) {
+            const res = await request(server)
+                .post('/execute/dml')
+                .send({ query })
+                .expect(200);
+            assertSuccess(res.body, 200);
+        }
+
+        // 3. Column aliases + single WHERE condition
+        const aliasWhereRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "SELECT id AS order_id, customer AS buyer_name, total AS amount FROM orders WHERE status = 'paid';",
+            })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(aliasWhereRes.body, 200);
+        expect(aliasWhereRes.body.data).toEqual([
+            { order_id: 1, buyer_name: 'Mohamed', amount: 250 },
+            { order_id: 2, buyer_name: 'Sara', amount: 600 },
+            { order_id: 3, buyer_name: 'Omar', amount: 900 },
+            { order_id: 5, buyer_name: 'Youssef', amount: 400 },
+        ]);
+
+        // 4. Table alias + column aliases + single WHERE + ORDER BY + LIMIT
+        const fullComboRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "SELECT o.customer AS buyer_name, o.total AS amount FROM orders o WHERE o.status = 'paid' ORDER BY o.total DESC LIMIT 2;",
+            })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(fullComboRes.body, 200);
+        expect(fullComboRes.body.data).toEqual([
+            { buyer_name: 'Omar', amount: 900 },
+            { buyer_name: 'Sara', amount: 600 },
+        ]);
+
+        // 5. Clean up table
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE orders;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('returns multiple records including NULL values and handles NULL filtering/sorting', async () => {
+        const server = app.getHttpServer();
+
+        // 1. Create table
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE employees (id INT, name VARCHAR(255), department VARCHAR(100), salary INT);',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 2. Seed multiple records, including NULL values
+        const inserts = [
+            "INSERT INTO employees (id, name, department, salary) VALUES (1, 'Mohamed', 'Backend', 1500);",
+            "INSERT INTO employees (id, name, department, salary) VALUES (2, 'Sara', NULL, 1800);",
+            "INSERT INTO employees (id, name, department, salary) VALUES (3, 'Omar', 'Frontend', NULL);",
+            "INSERT INTO employees (id, name, department, salary) VALUES (4, NULL, 'DevOps', 2000);",
+            "INSERT INTO employees (id, name, department, salary) VALUES (5, 'Nadia', NULL, NULL);",
+            "INSERT INTO employees (id, name, department, salary) VALUES (6, 'Youssef', 'Backend', 1200);",
+        ];
+
+        for (const query of inserts) {
+            const res = await request(server)
+                .post('/execute/dml')
+                .send({ query })
+                .expect(200);
+            assertSuccess(res.body, 200);
+        }
+
+        // 3. SELECT all records and verify NULL values are preserved
+        const allRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM employees;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(allRes.body, 200);
+        expect(allRes.body.data).toHaveLength(6);
+        expect(allRes.body.data).toEqual([
+            { id: 1, name: 'Mohamed', department: 'Backend', salary: 1500 },
+            { id: 2, name: 'Sara', department: null, salary: 1800 },
+            { id: 3, name: 'Omar', department: 'Frontend', salary: null },
+            { id: 4, name: null, department: 'DevOps', salary: 2000 },
+            { id: 5, name: 'Nadia', department: null, salary: null },
+            { id: 6, name: 'Youssef', department: 'Backend', salary: 1200 },
+        ]);
+
+        // 4. Single WHERE condition matching a non-null value across multiple rows
+        const backendRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "SELECT id AS emp_id, name AS emp_name, salary FROM employees WHERE department = 'Backend';",
+            })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(backendRes.body, 200);
+        expect(backendRes.body.data).toEqual([
+            { emp_id: 1, emp_name: 'Mohamed', salary: 1500 },
+            { emp_id: 6, emp_name: 'Youssef', salary: 1200 },
+        ]);
+
+        // 5. Clean up table
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE employees;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('returns a large result set cleanly and respects LIMIT on many rows', async () => {
+        const server = app.getHttpServer();
+        const totalRows = 150;
+
+        // 1. Create table
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE metrics (id INT, tag VARCHAR(100), value INT);',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 2. Seed many rows to exercise page splitting / multi-record reads
+        for (let i = 1; i <= totalRows; i++) {
+            const tag = i % 2 === 0 ? 'even' : 'odd';
+            const value = i * 10;
+            const res = await request(server)
+                .post('/execute/dml')
+                .send({
+                    query: `INSERT INTO metrics (id, tag, value) VALUES (${i}, '${tag}', ${value});`,
+                })
+                .expect(200);
+            assertSuccess(res.body, 200);
+        }
+
+        // 3. SELECT all rows (large result set)
+        const allRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM metrics;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(allRes.body, 200);
+        expect(Array.isArray(allRes.body.data)).toBe(true);
+        expect(allRes.body.data).toHaveLength(totalRows);
+        expect(allRes.body.data[0]).toEqual({ id: 1, tag: 'odd', value: 10 });
+        expect(allRes.body.data[totalRows - 1]).toEqual({
+            id: totalRows,
+            tag: 'even',
+            value: totalRows * 10,
+        });
+
+        // 4. Bound the large result set with ORDER BY + LIMIT
+        const topFiveRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'SELECT id, value FROM metrics ORDER BY value DESC LIMIT 5;',
+            })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(topFiveRes.body, 200);
+        expect(topFiveRes.body.data).toEqual([
+            { id: 150, value: 1500 },
+            { id: 149, value: 1490 },
+            { id: 148, value: 1480 },
+            { id: 147, value: 1470 },
+            { id: 146, value: 1460 },
+        ]);
+
+        // 5. Clean up table
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE metrics;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('creates a table with all supported data types and returns many rows with NULLs and unique VARCHAR values', async () => {
+        const server = app.getHttpServer();
+        const totalRows = 120;
+
+        // 1. Create wide table covering all supported datatypes
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query:
+                    'CREATE TABLE all_types_bench (' +
+                    'id SERIAL, ' +
+                    'int_col INT, ' +
+                    'integer_col INTEGER, ' +
+                    'varchar_col VARCHAR(255), ' +
+                    'char_col CHAR(10), ' +
+                    'date_col DATE, ' +
+                    'double_col DOUBLE, ' +
+                    'ts_col TIMESTAMP, ' +
+                    'dt_col DATETIME' +
+                    ');',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 2. Seed many rows mixing NULL and non-NULL values, with a distinct VARCHAR per row
+        const expectedRows: Record<string, unknown>[] = [];
+
+        for (let i = 1; i <= totalRows; i++) {
+            const uniqueVarchar = `unique_row_${i}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            const isNullPattern = i % 3;
+
+            const intVal = isNullPattern === 1 ? 'NULL' : `${i * 2}`;
+            const integerVal = isNullPattern === 2 ? 'NULL' : `${i * 100}`;
+            const charVal =
+                i % 4 === 0 ? 'NULL' : `'C${String(i).padStart(3, '0')}'`;
+            const dateVal =
+                i % 5 === 0
+                    ? 'NULL'
+                    : `'2026-01-${String((i % 28) + 1).padStart(2, '0')}'`;
+            const doubleVal = i % 6 === 0 ? 'NULL' : `${(i * 1.25).toFixed(2)}`;
+            const tsVal =
+                i % 7 === 0
+                    ? 'NULL'
+                    : `'2026-01-15 10:20:${String(i % 60).padStart(2, '0')}'`;
+            const dtVal =
+                i % 8 === 0
+                    ? 'NULL'
+                    : `'2026-02-20 14:30:${String(i % 60).padStart(2, '0')}'`;
+
+            const query =
+                `INSERT INTO all_types_bench ` +
+                `(int_col, integer_col, varchar_col, char_col, date_col, double_col, ts_col, dt_col) ` +
+                `VALUES (${intVal}, ${integerVal}, '${uniqueVarchar}', ${charVal}, ${dateVal}, ${doubleVal}, ${tsVal}, ${dtVal});`;
+
+            const insertRes = await request(server)
+                .post('/execute/dml')
+                .send({ query })
+                .expect(200);
+            assertSuccess(insertRes.body, 200);
+
+            expectedRows.push({
+                id: i,
+                int_col: isNullPattern === 1 ? null : i * 2,
+                integer_col: isNullPattern === 2 ? null : i * 100,
+                varchar_col: uniqueVarchar,
+                char_col: i % 4 === 0 ? null : `C${String(i).padStart(3, '0')}`,
+                date_col:
+                    i % 5 === 0
+                        ? null
+                        : `2026-01-${String((i % 28) + 1).padStart(2, '0')} 00:00:00`,
+                double_col: i % 6 === 0 ? null : Number((i * 1.25).toFixed(2)),
+                ts_col:
+                    i % 7 === 0
+                        ? null
+                        : `2026-01-15 10:20:${String(i % 60).padStart(2, '0')}`,
+                dt_col:
+                    i % 8 === 0
+                        ? null
+                        : `2026-02-20 14:30:${String(i % 60).padStart(2, '0')}`,
+            });
+        }
+
+        // 3. SELECT all rows and assert count, uniqueness of VARCHAR, NULLs, and values
+        const selectRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM all_types_bench;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes.body, 200);
+
+        const rows = selectRes.body.data;
+        expect(Array.isArray(rows)).toBe(true);
+        expect(rows).toHaveLength(totalRows);
+
+        const varcharValues = rows.map((r) => r.varchar_col);
+        expect(new Set(varcharValues).size).toBe(totalRows);
+        expect(rows).toEqual(expectedRows);
+
+        // 4. Clean up table
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE all_types_bench;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('validates DDL duplicate table creation and dropping a nonexistent table', async () => {
+        const server = app.getHttpServer();
+        const expectedErrorStatus = 400; // Adjust if your DDL filter returns 404/409/422
+
+        // 1. Create table
+        const firstCreate = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE ddl_users (id INT, name VARCHAR(255));',
+            })
+            .expect(200);
+        assertSuccess(firstCreate.body, 200);
+
+        // 2. Duplicate CREATE TABLE -> error
+        const duplicateCreate = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE ddl_users (id INT, name VARCHAR(255));',
+            })
+            .expect(expectedErrorStatus);
+        assertError(duplicateCreate.body, expectedErrorStatus);
+
+        // 3. Clean up existing table
+        const dropExisting = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE ddl_users;' })
+            .expect(200);
+        assertSuccess(dropExisting.body, 200);
+
+        // 4. DROP nonexistent table -> error
+        const dropMissing = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE nonexistent_table;' })
+            .expect(expectedErrorStatus);
+        assertError(dropMissing.body, expectedErrorStatus);
+    });
+
+    it('validates nonexistent columns across SELECT, ORDER BY, UPDATE, and DELETE', async () => {
+        const server = app.getHttpServer();
+        const expectedErrorStatus = 400; // Adjust to match your column validation status
+
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE col_check (id INT, name VARCHAR(255));',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        const seedRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO col_check (id, name) VALUES (1, 'Mohamed');",
+            })
+            .expect(200);
+        assertSuccess(seedRes.body, 200);
+
+        const invalidColumnQueries = [
+            'SELECT unknown FROM col_check;',
+            'SELECT * FROM col_check ORDER BY unknown;',
+            "UPDATE col_check SET unknown = 'x';",
+            'DELETE FROM col_check WHERE unknown = 1;',
+        ];
+
+        for (const query of invalidColumnQueries) {
+            const errRes = await request(server)
+                .post('/execute/dml')
+                .send({ query })
+                .expect(expectedErrorStatus);
+            assertError(errRes.body, expectedErrorStatus);
+        }
+
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE col_check;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('rejects invalid INSERT column names and datatype mismatches', async () => {
+        const server = app.getHttpServer();
+        const expectedErrorStatus = 400;
+
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE insert_check (id INT, name VARCHAR(255));',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 1. Nonexistent column in INSERT
+        const badColRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'INSERT INTO insert_check (nonexistent_column) VALUES (1);',
+            })
+            .expect(expectedErrorStatus);
+        assertError(badColRes.body, expectedErrorStatus);
+
+        // 2. Datatype mismatch in INSERT
+        const badTypeRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO insert_check (id) VALUES ('not an integer');",
+            })
+            .expect(expectedErrorStatus);
+        assertError(badTypeRes.body, expectedErrorStatus);
+
+        // Optional constraint checks (uncomment if your engine supports PRIMARY KEY / UNIQUE / NOT NULL):
+        // const dupPkRes = await request(server)
+        //     .post('/execute/dml')
+        //     .send({ query: "INSERT INTO insert_check (id, name) VALUES (1, 'Dup');" })
+        //     .expect(expectedErrorStatus);
+        // assertError(dupPkRes.body, expectedErrorStatus);
+
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE insert_check;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('rejects invalid UPDATE column names and datatype mismatches', async () => {
+        const server = app.getHttpServer();
+        const expectedErrorStatus = 400;
+
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE update_check (id INT, name VARCHAR(255));',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        const seedRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO update_check (id, name) VALUES (1, 'Mohamed');",
+            })
+            .expect(200);
+        assertSuccess(seedRes.body, 200);
+
+        // 1. Nonexistent column in UPDATE
+        const badColRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "UPDATE update_check SET nonexistent = 'x' WHERE id = 1;",
+            })
+            .expect(expectedErrorStatus);
+        assertError(badColRes.body, expectedErrorStatus);
+
+        // 2. Datatype mismatch in UPDATE
+        const badTypeRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "UPDATE update_check SET id = 'invalid' WHERE id = 1;",
+            })
+            .expect(expectedErrorStatus);
+        assertError(badTypeRes.body, expectedErrorStatus);
+
+        // Optional UNIQUE constraint check (uncomment if supported):
+        // const dupUniqueRes = await request(server)
+        //     .post('/execute/dml')
+        //     .send({
+        //         query: "UPDATE update_check SET email = 'existing@email.com' WHERE id = 2;",
+        //     })
+        //     .expect(expectedErrorStatus);
+        // assertError(dupUniqueRes.body, expectedErrorStatus);
+
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE update_check;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('handles DELETE with no matching rows without corrupting existing data', async () => {
+        const server = app.getHttpServer();
+
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE del_check (id INT, name VARCHAR(255));',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        const seedRows = [
+            "INSERT INTO del_check (id, name) VALUES (1, 'Mohamed');",
+            "INSERT INTO del_check (id, name) VALUES (2, 'Sara');",
+        ];
+        for (const query of seedRows) {
+            const res = await request(server)
+                .post('/execute/dml')
+                .send({ query })
+                .expect(200);
+            assertSuccess(res.body, 200);
+        }
+
+        // DELETE matching nothing
+        const deleteMissingRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'DELETE FROM del_check WHERE id = 999;' })
+            .expect(200);
+        assertSuccess(deleteMissingRes.body, 200);
+
+        // Existing rows should remain intact
+        const selectRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM del_check;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes.body, 200);
+        expect(selectRes.body.data).toEqual([
+            { id: 1, name: 'Mohamed' },
+            { id: 2, name: 'Sara' },
+        ]);
+
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE del_check;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('returns an empty array [] for SELECT with no matching rows on an existing table', async () => {
+        const server = app.getHttpServer();
+
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE empty_match (id INT, name VARCHAR(255));',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        const seedRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO empty_match (id, name) VALUES (1, 'Mohamed');",
+            })
+            .expect(200);
+        assertSuccess(seedRes.body, 200);
+
+        const selectMissingRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM empty_match WHERE id = 999;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectMissingRes.body, 200);
+        expect(selectMissingRes.body.data).toEqual([]);
+
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE empty_match;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
+
+    it('rejects unsupported SQL commands and malformed SQL syntax with 4xx StandardErrorResponse', async () => {
+        const server = app.getHttpServer();
+
+        // 1. Unsupported command (e.g. ALTER TABLE / TRUNCATE)
+        const unsupportedRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'ALTER TABLE users ADD COLUMN age INT;' });
+
+        expect(unsupportedRes.status).toBeGreaterThanOrEqual(400);
+        expect(unsupportedRes.status).toBeLessThan(500);
+        assertError(unsupportedRes.body, unsupportedRes.status);
+
+        // 2. Malformed SQL syntax
+        const malformedRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT FROM users;' });
+
+        expect(malformedRes.status).toBeGreaterThanOrEqual(400);
+        expect(malformedRes.status).toBeLessThan(500);
+        assertError(malformedRes.body, malformedRes.status);
+    });
 });
