@@ -946,4 +946,87 @@ describe('SQL Engine E2E Tests', () => {
         expect(malformedRes.status).toBeLessThan(500);
         assertError(malformedRes.body, malformedRes.status);
     });
+
+    it('supports UPDATE across single/multiple rows, multiple columns, NULL values, and non-matching WHERE', async () => {
+        const server = app.getHttpServer();
+
+        // 1. Create table
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query: 'CREATE TABLE accounts (id INT, owner VARCHAR(255), balance INT, tier VARCHAR(50));',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 2. Seed rows
+        const inserts = [
+            "INSERT INTO accounts (id, owner, balance, tier) VALUES (1, 'Mohamed', 500, 'standard');",
+            "INSERT INTO accounts (id, owner, balance, tier) VALUES (2, 'Sara', 1200, 'standard');",
+            "INSERT INTO accounts (id, owner, balance, tier) VALUES (3, 'Omar', 800, 'standard');",
+        ];
+
+        for (const query of inserts) {
+            const res = await request(server)
+                .post('/execute/dml')
+                .send({ query })
+                .expect(200);
+            assertSuccess(res.body, 200);
+        }
+
+        // 3. Single-row UPDATE with multiple columns
+        const multiColUpdate = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "UPDATE accounts SET balance = 2500, tier = 'vip' WHERE id = 2;",
+            })
+            .expect(200);
+        assertSuccess(multiColUpdate.body, 200);
+
+        // 4. Multi-row UPDATE matching a single WHERE condition
+        const multiRowUpdate = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "UPDATE accounts SET tier = 'active' WHERE tier = 'standard';",
+            })
+            .expect(200);
+        assertSuccess(multiRowUpdate.body, 200);
+
+        // 5. Update a column to NULL
+        const setNullUpdate = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'UPDATE accounts SET tier = NULL WHERE id = 1;',
+            })
+            .expect(200);
+        assertSuccess(setNullUpdate.body, 200);
+
+        // 6. UPDATE with non-matching WHERE should leave rows unchanged
+        const noMatchUpdate = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'UPDATE accounts SET balance = 99999 WHERE id = 999;',
+            })
+            .expect(200);
+        assertSuccess(noMatchUpdate.body, 200);
+
+        // 7. Verify final state
+        const selectRes = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM accounts;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectRes.body, 200);
+        expect(selectRes.body.data).toEqual([
+            { id: 1, owner: 'Mohamed', balance: 500, tier: null },
+            { id: 2, owner: 'Sara', balance: 2500, tier: 'vip' },
+            { id: 3, owner: 'Omar', balance: 800, tier: 'active' },
+        ]);
+
+        // 8. Clean up table
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE accounts;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
 });
