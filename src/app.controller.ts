@@ -7,18 +7,12 @@ import {
     Post,
 } from '@nestjs/common';
 import { AppService } from './app.service.js';
-import { RecordManager } from './modules/storage/record-manager/record-manager.js';
-import { CHAR, INT } from './modules/storage/dto/datatype.dto.js';
-import { Tokenizer } from './modules/sql-engine/tokenizer/tokenizer.js';
-import { Token } from './modules/sql-engine/tokenizer/token.class.js';
 import { SqlEngineService } from './modules/sql-engine/sql-engine.service.js';
 
 @Controller()
 export class AppController {
     constructor(
         private readonly appService: AppService,
-        private readonly recordManager: RecordManager,
-        private readonly tokenizer: Tokenizer,
         private readonly sqlEngine: SqlEngineService,
     ) {}
 
