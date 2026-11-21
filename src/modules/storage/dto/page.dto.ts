@@ -188,8 +188,25 @@ export class TablePage extends Page {
         const tupleLength: number = tupleBuffer.length;
 
         if (this._slots[slotIndex].length < tupleLength) {
-            this.deleteTuple(slotIndex);
-            return this.addTuple(tupleBuffer);
+            const currentSlotArrayEnd =
+                HEADER_SIZE + this._header.itemsCount * SLOT_SIZE;
+            const newTupleOffset =
+                this._header.freeSpace - tupleLength;
+
+            if (newTupleOffset < currentSlotArrayEnd) {
+                this.deleteTuple(slotIndex);
+                return this.addTuple(tupleBuffer);
+            }
+
+            tupleBuffer.copy(this.data, newTupleOffset, 0, tupleLength);
+            this._header.freeSpace = newTupleOffset;
+            this._slots[slotIndex] = {
+                offset: newTupleOffset,
+                length: tupleLength,
+                isDeleted: false,
+            };
+
+            return slotIndex;
         }
 
         const tupleOffset = this._slots[slotIndex].offset;

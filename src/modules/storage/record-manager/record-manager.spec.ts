@@ -61,6 +61,21 @@ describe('RecordManager', () => {
         expect(deserialized.length).toBe(record.length);
     });
 
+    it('should deserialize a VARCHAR using its serialized size', () => {
+        const recordManager = new RecordManager(pageManagerMock);
+        const serialized = recordManager['serializeRecord']([
+            new INT(1),
+            new VARCHAR('Mohamed', 255),
+        ]);
+        const deserialized = recordManager['deserializeRecord'](serialized, [
+            new INT(0),
+            new VARCHAR('', 255),
+        ]);
+
+        expect(deserialized[0].value).toBe(1);
+        expect(deserialized[1].value).toBe('Mohamed');
+    });
+
     it('should spy on the page manager mock passed to it', async () => {
         const recordManager = new RecordManager(pageManagerMock);
         const createPageSpy = vi.spyOn(pageManagerMock, 'addRecord');

@@ -275,12 +275,17 @@ export class VARCHAR extends Datatype<string> {
     }
 
     public serialize(): Buffer {
+        if (this.isNull) {
+            const buffer = Buffer.alloc(3);
+            buffer.writeUInt8(1, 0);
+            return buffer;
+        }
+
         const buffer = Buffer.alloc(this.size);
-        buffer.writeUInt8(this.isNull ? 1 : 0, 0);
-        if (this.isNull) return buffer;
+        buffer.writeUInt8(0, 0);
 
         buffer.writeUInt16BE(this.size, 1);
-        buffer.write(this.value, 3, this.size, 'utf-8');
+        buffer.write(this.value, 3, 'utf-8');
         return buffer;
     }
     public deserialize(buffer: Buffer): Datatype<string> {

@@ -4,8 +4,6 @@ import { FileManager } from '../file-manager/file-manager.js';
 import { Catalog } from '../dto/catalog.dto.js';
 import { PageType } from '../dto/page-type.dto.js';
 import { RID } from '../dto/rid.dto.js';
-import { DatatypeEnum } from '../dto/datatype.dto.js';
-import { table } from 'console';
 
 export { PageType } from '../dto/page-type.dto.js';
 

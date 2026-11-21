@@ -89,7 +89,7 @@ export class InsertAST extends DML {
         const row: InsertRow = { columns: [] };
         let id = 0;
         while (!this.expect(new PunctuationToken(')'))) {
-            if (id >= this.columns.length) {
+            if (this.columns.length > 0 && id >= this.columns.length) {
                 throw new SyntaxErrorException(
                     `Too many values provided for the INSERT statement. Expected ${this.columns.length} values, but got more.`,
                 );
@@ -148,7 +148,7 @@ export class InsertAST extends DML {
             }
         }
 
-        if (id !== this.columns.length) {
+        if (this.columns.length > 0 && id !== this.columns.length) {
             throw new SyntaxErrorException(
                 `Too few values provided for the INSERT statement. Expected ${this.columns.length} values, but got ${id}.`,
             );
@@ -192,6 +192,12 @@ export class InsertAST extends DML {
 
         if (this.expect(new PunctuationToken('('))) {
             this.parseColumnsNames();
+        } else {
+            this.missedTokenError(
+                'column list',
+                parser.peek()?.type ?? null,
+                parser.peek()?.position ?? null,
+            );
         }
 
         if (!parser.expect(new KeywordToken('VALUES'))) {

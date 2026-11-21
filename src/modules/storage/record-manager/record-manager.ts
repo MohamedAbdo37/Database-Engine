@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Datatype } from '../dto/datatype.dto.js';
+import { Datatype, DatatypeEnum } from '../dto/datatype.dto.js';
 import { RID } from '../dto/rid.dto.js';
 import { PageManager } from '../page-manager/page-manager.js';
 import { Row } from '../table-manager/table.dto.js';
@@ -53,26 +53,7 @@ export class RecordManager {
     }
 
     private serializeRecord(record: Datatype<any>[]): Buffer {
-        const totalSize = record.reduce(
-            (sum, datatype) => sum + datatype.size,
-            0,
-        );
-
-        const recordBuffer = Buffer.alloc(totalSize);
-
-        let offset = 0;
-        for (const field of record) {
-            recordBuffer.write(
-                field.serialize().toString('hex'),
-                offset,
-                field.size,
-                'hex',
-            );
-
-            offset += field.size;
-        }
-
-        return recordBuffer;
+        return Buffer.concat(record.map((field) => field.serialize()));
     }
 
     private deserializeRecord(
@@ -88,13 +69,20 @@ export class RecordManager {
                 field,
             ) as Datatype<any>;
 
-            deserializedRecord.push(
-                fieldCopy.deserialize(
-                    recordBuffer.subarray(offset, offset + field.size),
-                ),
-            );
+            let fieldSize = field.size;
+            if (field.type === DatatypeEnum.VARCHAR) {
+                const isNull = recordBuffer.readUInt8(offset) === 1;
+                fieldSize = isNull ? 3 : recordBuffer.readUInt16BE(offset + 1);
+            }
 
-            offset += field.size;
+            const fieldBuffer = recordBuffer.subarray(
+                offset,
+                offset + fieldSize,
+            );
+            const deserializedField = fieldCopy.deserialize(fieldBuffer);
+            deserializedRecord.push(deserializedField);
+
+            offset += fieldSize;
         }
 
         return deserializedRecord;
