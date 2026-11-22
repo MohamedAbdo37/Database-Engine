@@ -7,7 +7,7 @@ import {
     SelectClause,
 } from '../../parser/ast/select.class.js';
 import { ExecutionErrorException } from '../../exceptions/execution-error.exc.js';
-import { WhereCondition } from '../../parser/ast/dml/dml.class.js';
+import { WhereClauseAST } from '../../parser/ast/dml/where-clause.ast.js';
 
 @Injectable()
 export class SelectValidator implements ValidatorIF {
@@ -119,7 +119,7 @@ export class SelectValidator implements ValidatorIF {
 
     private validateWhereColumn(
         columnRef: string | undefined,
-        operand: WhereCondition['rightOperand'],
+        operand: WhereClauseAST['rightOperand'],
         isRightOperand: boolean,
     ): void {
         let table: FromClause | undefined;
@@ -162,13 +162,13 @@ export class SelectValidator implements ValidatorIF {
 
         if (isRightOperand) {
             this.ast.whereClause.rightOperand =
-                WhereCondition.validateWhereOperandAsColumn(
+                WhereClauseAST.validateWhereOperandAsColumn(
                     this.ast.whereClause.rightOperand,
                     table.schema!,
                 );
         } else {
             this.ast.whereClause.leftOperand =
-                WhereCondition.validateWhereOperandAsColumn(
+                WhereClauseAST.validateWhereOperandAsColumn(
                     this.ast.whereClause.leftOperand,
                     table.schema!,
                 );

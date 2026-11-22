@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TableManager } from '../../../storage/table-manager/table-manager.js';
 import { Validator, ValidatorIF } from '../validator.js';
 import { DeleteAST } from '../../parser/ast/dml/delete.ast.js';
-import { WhereCondition } from '../../parser/ast/dml/dml.class.js';
+import { WhereClauseAST } from '../../parser/ast/dml/where-clause.ast.js';
 
 @Injectable()
 export class DeleteValidator implements ValidatorIF {
@@ -25,14 +25,14 @@ export class DeleteValidator implements ValidatorIF {
 
         if (ast.whereCondition.isLeftOperandColumn)
             ast.whereCondition.leftOperand =
-                WhereCondition.validateWhereOperandAsColumn(
+                WhereClauseAST.validateWhereOperandAsColumn(
                     ast.whereCondition.leftOperand,
                     schema,
                 );
 
         if (ast.whereCondition.isRightOperandColumn)
             ast.whereCondition.rightOperand =
-                WhereCondition.validateWhereOperandAsColumn(
+                WhereClauseAST.validateWhereOperandAsColumn(
                     ast.whereCondition.rightOperand,
                     schema,
                 );

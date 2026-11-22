@@ -10,7 +10,8 @@ import {
 } from '../../../tokenizer/token.class.js';
 import { ParserGenerator } from '../../parser.js';
 import { AST, DMLType } from '../ast.class.js';
-import { DML, WhereCondition } from './dml.class.js';
+import { DML } from './dml.class.js';
+import { WhereClauseAST } from './where-clause.ast.js';
 
 export interface UpdateColumnAssignment {
     column: string;
@@ -22,12 +23,12 @@ export class UpdateAST extends DML {
     private parser: ParserGenerator;
     private _columns: UpdateColumnAssignment[] = [];
 
-    private _whereCondition: WhereCondition;
+    private _whereCondition: WhereClauseAST;
 
-    public get whereCondition(): WhereCondition {
+    public get whereCondition(): WhereClauseAST {
         return this._whereCondition;
     }
-    public set whereCondition(value: WhereCondition) {
+    public set whereCondition(value: WhereClauseAST) {
         this._whereCondition = value;
     }
 
@@ -139,238 +140,12 @@ export class UpdateAST extends DML {
     }
 
     private parseCondition(): void {
-        const whereCondition: WhereCondition = {
-            leftOperand: null,
-            isLeftOperandColumn: false,
-            leftColumnRef: undefined,
-            operator: WhereOperator.EQUALS,
-            rightOperand: null,
-            isRightOperandColumn: false,
-            rightColumnRef: undefined,
-        };
-        const openPrenticesToken: Token[] = [];
-        while (this.expect(new PunctuationToken('('))) {
-            openPrenticesToken.push(this.peek()!);
-            this.consume(); // Consume the '(' token
-        }
-
-        const leftToken = this.peek();
-        if (
-            !leftToken ||
-            (leftToken.type !== TokenType.IDENTIFIER &&
-                leftToken.type !== TokenType.LITERAL &&
-                leftToken.type !== TokenType.NUMBER &&
-                leftToken.type !== TokenType.KEYWORD)
-        ) {
-            this.missedTokenError(
-                'left_operand',
-                leftToken ? leftToken.value : null,
-                leftToken ? leftToken.position : null,
-                'WHERE',
-            );
-        }
-        if (leftToken.equals(new KeywordToken('NULL'))) {
-            throw new SyntaxErrorException(
-                `Unexpected token 'NULL' at ${leftToken.position}. 'NULL' cannot be used as a left operand in a WHERE condition.`,
-            );
-        } else if (leftToken.type === TokenType.LITERAL) {
-            whereCondition.leftOperand = leftToken.value.slice(1, -1); // Remove the surrounding quotes
-        } else if (leftToken.type === TokenType.NUMBER) {
-            whereCondition.leftOperand = Number(leftToken.value);
-        } else if (
-            leftToken.equals(new KeywordToken('TRUE')) ||
-            leftToken.equals(new KeywordToken('FALSE'))
-        ) {
-            whereCondition.leftOperand = leftToken.equals(
-                new KeywordToken('TRUE'),
-            )
-                ? 1
-                : 0;
-        } else if (leftToken.type === TokenType.IDENTIFIER) {
-            whereCondition.leftOperand = leftToken.value;
-            whereCondition.isLeftOperandColumn = true;
-        } else {
-            this.missedTokenError(
-                'VALUE',
-                leftToken.value,
-                leftToken.position,
-                `${leftToken.value} =`,
-            );
-        }
-
-        this.consume(); // Consume the left operand token
-
-        while (this.expect(new PunctuationToken(')'))) {
-            if (openPrenticesToken.length === 0) {
-                const foundToken = this.peek();
-                throw new SyntaxErrorException(
-                    `Detected a closing parenthesis ')' at ${foundToken?.position} without a corresponding opening parenthesis '('.`,
-                );
-            }
-            openPrenticesToken.pop();
-            this.consume(); // Consume the ')' token
-        }
-
-        const operatorToken = this.peek();
-
-        if (
-            !operatorToken ||
-            (operatorToken.type !== TokenType.SINGLE_CHARACTER_OPERATOR &&
-                operatorToken.type !== TokenType.MULTI_CHARACTER_OPERATOR &&
-                operatorToken.equals(new KeywordToken('IS')) === false)
-        ) {
-            this.missedTokenError(
-                'operator',
-                operatorToken ? operatorToken.value : null,
-                operatorToken ? operatorToken.position : null,
-                `${whereCondition.leftOperand}`,
-            );
-        }
-
-        switch (true) {
-            case operatorToken.equals(new SingleCharacterOperatorToken('=')):
-                whereCondition.operator = WhereOperator.EQUALS;
-                break;
-            case operatorToken.equals(new SingleCharacterOperatorToken('>')):
-                whereCondition.operator = WhereOperator.GREATER_THAN;
-                break;
-            case operatorToken.equals(new SingleCharacterOperatorToken('<')):
-                whereCondition.operator = WhereOperator.LESS_THAN;
-                break;
-            case operatorToken.equals(new MultiCharacterOperatorToken('>=')):
-                whereCondition.operator = WhereOperator.GREATER_THAN_OR_EQUAL;
-                break;
-            case operatorToken.equals(new MultiCharacterOperatorToken('<=')):
-                whereCondition.operator = WhereOperator.LESS_THAN_OR_EQUAL;
-                break;
-            case operatorToken.equals(new MultiCharacterOperatorToken('!=')):
-                whereCondition.operator = WhereOperator.NOT_EQUALS;
-                break;
-            case operatorToken.equals(new KeywordToken('IS')):
-                this.consume(); // Consume the 'IS' operator token2
-                whereCondition.operator = WhereOperator.EQUALS;
-                if (
-                    this.next() !== null &&
-                    this.next()?.equals(new KeywordToken('NOT'))
-                ) {
-                    whereCondition.operator = WhereOperator.NOT_EQUALS;
-                    this.consume(); // Consume the 'NOT' token
-                }
-
-                if (!this.expect(new KeywordToken('NULL'))) {
-                    this.missedTokenError(
-                        'NULL',
-                        this.peek() ? this.peek()!.value : null,
-                        this.peek() ? this.peek()!.position : null,
-                        `${whereCondition.leftOperand} IS${
-                            whereCondition.operator === WhereOperator.NOT_EQUALS
-                                ? ' NOT'
-                                : ''
-                        }`,
-                    );
-                }
-                whereCondition.rightOperand = null;
-                whereCondition.isRightOperandColumn = false;
-                this.whereCondition = whereCondition;
-                this.consume(); // Consume the 'NULL' token
-
-                while (this.expect(new PunctuationToken(')'))) {
-                    if (openPrenticesToken.length === 0) {
-                        const foundToken = this.peek();
-                        throw new SyntaxErrorException(
-                            `Detected a closing parenthesis ')' at ${foundToken?.position} without a corresponding opening parenthesis '('.`,
-                        );
-                    }
-                    openPrenticesToken.pop();
-                    this.consume(); // Consume the ')' token
-                }
-
-                return; // Exit the function as we have handled the IS [NOT] NULL case
-            default:
-                this.missedTokenError(
-                    'OPERATOR',
-                    operatorToken ? operatorToken.value : null,
-                    operatorToken ? operatorToken.position : null,
-                    `${whereCondition.leftOperand}`,
-                );
-        }
-
-        this.consume(); // Consume the operator token
-
-        while (this.expect(new PunctuationToken('('))) {
-            openPrenticesToken.push(this.peek()!);
-            this.consume(); // Consume the '(' token
-        }
-
-        const rightToken = this.peek();
-
-        if (
-            !rightToken ||
-            (rightToken.type !== TokenType.IDENTIFIER &&
-                rightToken.type !== TokenType.LITERAL &&
-                rightToken.type !== TokenType.NUMBER &&
-                rightToken.type !== TokenType.KEYWORD)
-        ) {
-            this.missedTokenError(
-                'left_operand',
-                rightToken ? rightToken.value : null,
-                rightToken ? rightToken.position : null,
-                'WHERE',
-            );
-        }
-        if (rightToken.equals(new KeywordToken('NULL'))) {
-            throw new SyntaxErrorException(
-                `Invalid NULL comparison at ${rightToken.position}. NULL must be compared using IS NULL or IS NOT NULL, not as a direct right-hand operand.`,
-            );
-        } else if (rightToken.type === TokenType.LITERAL) {
-            whereCondition.rightOperand = rightToken.value.slice(1, -1); // Remove the surrounding quotes
-        } else if (rightToken.type === TokenType.NUMBER) {
-            whereCondition.rightOperand = Number(rightToken.value);
-        } else if (
-            rightToken.equals(new KeywordToken('TRUE')) ||
-            rightToken.equals(new KeywordToken('FALSE'))
-        ) {
-            whereCondition.rightOperand = rightToken.equals(
-                new KeywordToken('TRUE'),
-            )
-                ? 1
-                : 0;
-        } else if (rightToken.type === TokenType.IDENTIFIER) {
-            whereCondition.rightOperand = rightToken.value;
-            whereCondition.isRightOperandColumn = true;
-        } else {
-            this.missedTokenError(
-                'VALUE',
-                rightToken.value,
-                rightToken.position,
-                `${rightToken.value} =`,
-            );
-        }
-        this.consume(); // Consume the right operand token
-
-        while (this.expect(new PunctuationToken(')'))) {
-            if (openPrenticesToken.length === 0) {
-                const foundToken = this.peek();
-                throw new SyntaxErrorException(
-                    `Detected a closing parenthesis ')' at ${foundToken?.position} without a corresponding opening parenthesis '('.`,
-                );
-            }
-            openPrenticesToken.pop();
-            this.consume(); // Consume the ')' token
-        }
-
-        if (openPrenticesToken.length > 0) {
-            if (!this.expect(new PunctuationToken(')'))) {
-                throw new SyntaxErrorException(
-                    `Detected an opening parenthesis '(' at ${openPrenticesToken[0].position} but no corresponding closing parenthesis ')' was found.`,
-                );
-            }
-        }
-
-        this._whereCondition = whereCondition;
+        this._whereCondition = new WhereClauseAST().parse(
+            this.parser,
+        ) as WhereClauseAST;
     }
 
-    public parse(parser: ParserGenerator): AST | null {
+    public parse(parser: ParserGenerator): UpdateAST | null {
         this.parser = parser;
         this.consume(); // Consume the 'UPDATE' keyword
 
