@@ -21,9 +21,6 @@ export class CreateValidator implements ValidatorIF {
 
         if (isTableExists) {
             if (ast.ifNotExists) {
-                console.log(
-                    `Table '${ast.tableName}' already exists. Skipping creation as 'IF NOT EXISTS' clause is specified.`,
-                );
                 return;
             }
 

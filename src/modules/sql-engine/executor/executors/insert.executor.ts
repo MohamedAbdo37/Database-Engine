@@ -65,13 +65,7 @@ export class InsertExecutor implements ExecutorIF {
         const schemaColumn = tableSchema.getColumnByName(column.name)!;
 
         if (column.isNullable) {
-            if (!schemaColumn.isNullable) {
-                record[schemaColumn.id].value = schemaColumn.defaultValue;
-            } else if (schemaColumn.defaultValue === null) {
-                record[schemaColumn.id].isNull = true;
-            } else {
-                record[schemaColumn.id].value = schemaColumn.defaultValue;
-            }
+            record[schemaColumn.id].isNull = true;
             return;
         }
 

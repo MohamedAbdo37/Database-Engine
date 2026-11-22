@@ -12,11 +12,19 @@ import {
 import { ColumnDefinition } from './ast/ddl/column-definition.ast.js';
 import { CreateTableAST } from './ast/ddl/create-table.ast.js';
 import { UpdateAST } from './ast/dml/update.ast.js';
-import { ParserGenerator } from './parser.js';
+import { ParserGenerator } from './parsers/parser-generator.parser.js';
 import { Tokenizer } from '../tokenizer/tokenizer.js';
 import { DeleteAST } from './ast/dml/delete.ast.js';
 import { DropTableAST } from './ast/ddl/drop-table.ast.js';
-import { OrderDirection, SelectAST } from './ast/select.class.js';
+import { SelectAST } from './ast/select.class.js';
+import { OrderDirection } from './ast/ast.class.js';
+import { ColumnDefinitionParser } from './parsers/column-definition.parser.js';
+import { CreateParser } from './parsers/create.parser.js';
+import { DropParser } from './parsers/drop.pareser.js';
+import { InsertAST } from './ast/dml/insert.ast.js';
+import { UpdateParser } from './parsers/update.parser.js';
+import { DeleteParser } from './parsers/delete.parser.js';
+import { SelectParser } from './parsers/select.parser.js';
 
 describe('ParserGenerator parse method', () => {
     it('should be defined', () => {
@@ -159,40 +167,36 @@ describe('ColumnDefinitionAST parse method', () => {
 
     it('should throw an error for missing column name', () => {
         const tokens = [new DatatypeToken('INT')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected column name, but found 'INT' at undefined.",
         );
     });
 
     it('should throw an error for missing column name and found EOI', () => {
         const tokens: Token[] = [];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             'Expected column name, but found end of input.',
         );
     });
 
     it('should throw an error for missing datatype', () => {
         const tokens = [new IdentifierToken('id'), new PunctuationToken(',')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected datatype for column 'id', but found ',' at undefined.",
         );
     });
 
     it('should throw an error for missing datatype and found EOI', () => {
         const tokens = [new IdentifierToken('id')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected datatype for column 'id', but found end of input.",
         );
     });
@@ -203,10 +207,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new DatatypeToken('INT'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Unexpected token 'WHERE' at undefined while parsing constraints for column 'id'.",
         );
     });
@@ -218,10 +221,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('PRIMARY'),
             new KeywordToken('UNIQUE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected 'KEY' after 'PRIMARY' for column 'id', but found 'UNIQUE' at undefined.",
         );
     });
@@ -232,10 +234,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new DatatypeToken('INT'),
             new KeywordToken('PRIMARY'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected 'KEY' after 'PRIMARY' for column 'id', but found end of input.",
         );
     });
@@ -248,10 +249,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('KEY'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Unexpected token 'WHERE' at undefined while parsing constraints for column 'id'.",
         );
     });
@@ -263,10 +263,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('NOT'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected 'NULL' after 'NOT' for column 'id', but found 'WHERE' at undefined.",
         );
     });
@@ -277,10 +276,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new DatatypeToken('INT'),
             new KeywordToken('NOT'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected 'NULL' after 'NOT' for column 'id', but found end of input.",
         );
     });
@@ -295,10 +293,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('NULL'),
         ];
 
-        let parserGenerator = new ParserGenerator(tokens);
-        let columnDefinitionAST = new ColumnDefinition();
+        let columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Duplicate constraint 'NOT NULL' found for column 'id' at undefined.",
         );
 
@@ -311,10 +308,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('KEY'),
         ];
 
-        parserGenerator = new ParserGenerator(tokens);
-        columnDefinitionAST = new ColumnDefinition();
+        columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Duplicate constraint 'PRIMARY KEY' found for column 'id' at undefined.",
         );
 
@@ -325,9 +321,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('UNIQUE'),
         ];
 
-        parserGenerator = new ParserGenerator(tokens);
-        columnDefinitionAST = new ColumnDefinition();
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        columnDefinitionParser = new ColumnDefinitionParser(tokens);
+
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Duplicate constraint 'UNIQUE' found for column 'id' at undefined.",
         );
 
@@ -338,9 +334,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('NULL'),
         ];
 
-        parserGenerator = new ParserGenerator(tokens);
-        columnDefinitionAST = new ColumnDefinition();
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        columnDefinitionParser = new ColumnDefinitionParser(tokens);
+
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Duplicate constraint 'NULL' found for column 'id' at undefined.",
         );
     });
@@ -354,10 +350,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('NULL'),
         ];
 
-        let parserGenerator = new ParserGenerator(tokens);
-        let columnDefinitionAST = new ColumnDefinition();
+        let columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Conflicting constraints 'NOT NULL' and 'NULL' found for column 'id' at undefined.",
         );
 
@@ -369,10 +364,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('NULL'),
         ];
 
-        parserGenerator = new ParserGenerator(tokens);
-        columnDefinitionAST = new ColumnDefinition();
+        columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Conflicting constraints 'NULL' and 'NOT NULL' found for column 'id' at undefined.",
         );
 
@@ -384,10 +378,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('NULL'),
         ];
 
-        parserGenerator = new ParserGenerator(tokens);
-        columnDefinitionAST = new ColumnDefinition();
+        columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Conflicting constraints 'PRIMARY KEY' and 'NULL' found for column 'id' at undefined.",
         );
 
@@ -399,10 +392,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('KEY'),
         ];
 
-        parserGenerator = new ParserGenerator(tokens);
-        columnDefinitionAST = new ColumnDefinition();
+        columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Conflicting constraints 'NULL' and 'PRIMARY KEY' found for column 'id' at undefined.",
         );
 
@@ -413,10 +405,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('NULL'),
         ];
 
-        parserGenerator = new ParserGenerator(tokens);
-        columnDefinitionAST = new ColumnDefinition();
+        columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Conflicting constraints 'UNIQUE' and 'NULL' found for column 'id' at undefined.",
         );
 
@@ -427,10 +418,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('UNIQUE'),
         ];
 
-        parserGenerator = new ParserGenerator(tokens);
-        columnDefinitionAST = new ColumnDefinition();
+        columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Conflicting constraints 'NULL' and 'UNIQUE' found for column 'id' at undefined.",
         );
     });
@@ -442,10 +432,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('DEFAULT'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected default value for column 'id', but found end of input.",
         );
     });
@@ -458,10 +447,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('WHERE'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionParser = new ColumnDefinitionParser(tokens);
 
-        expect(() => columnDefinitionAST.parse(parserGenerator)).toThrow(
+        expect(() => columnDefinitionParser.parse()).toThrow(
             "Expected default value for column 'id', but found WHERE at undefined.",
         );
     });
@@ -476,11 +464,10 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('DEFAULT'),
             new LiteralToken("'it\\'s'"),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
 
-        const parsedColumn = new ColumnDefinition().parse(
-            parserGenerator,
-        ) as ColumnDefinition;
+        const parsedColumn = new ColumnDefinitionParser(
+            tokens,
+        ).parse() as ColumnDefinition;
 
         expect(parsedColumn.defaultValue).toBe("it\\'s");
     });
@@ -493,10 +480,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new LiteralToken("'2023-06-01 12:00:00'"),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition().parse(
-            parserGenerator,
-        ) as ColumnDefinition;
+        const parsedColumn = new ColumnDefinitionParser(
+            tokens,
+        ).parse() as ColumnDefinition;
 
         expect(parsedColumn.defaultValue).toBe('2023-06-01 12:00:00');
     });
@@ -509,10 +495,10 @@ describe('ColumnDefinitionAST parse method', () => {
             new LiteralToken("'invalid'"),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
-
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(
+            () =>
+                new ColumnDefinitionParser(tokens).parse() as ColumnDefinition,
+        ).toThrow(
             "Expected numeric default value for column 'id', but found 'invalid' at undefined.",
         );
     });
@@ -525,10 +511,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new LiteralToken("'invalid'"),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
+        const parsedColumn = new ColumnDefinitionParser(tokens);
 
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(() => parsedColumn.parse() as ColumnDefinition).toThrow(
             "Expected numeric default value for column 'price', but found 'invalid' at undefined.",
         );
     });
@@ -541,10 +526,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new LiteralToken("'invalid'"),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
+        const parsedColumn = new ColumnDefinitionParser(tokens);
 
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(() => parsedColumn.parse() as ColumnDefinition).toThrow(
             "Expected boolean default value ('TRUE' or 'FALSE') for column 'is_active', but found 'invalid' at undefined.",
         );
     });
@@ -560,10 +544,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new NumberToken('123'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
+        const parsedColumn = new ColumnDefinitionParser(tokens);
 
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(() => parsedColumn.parse()).toThrow(
             "Expected string default value for column 'name', but found '123' at undefined.",
         );
     });
@@ -579,10 +562,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new NumberToken('123'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
+        const parsedColumn = new ColumnDefinitionParser(tokens);
 
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(() => parsedColumn.parse()).toThrow(
             "Expected string default value for column 'initial', but found '123' at undefined.",
         );
     });
@@ -598,10 +580,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new LiteralToken("'exceeding'"),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
+        const parsedColumn = new ColumnDefinitionParser(tokens);
 
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(() => parsedColumn.parse()).toThrow(
             "Default value 'exceeding' exceeds the defined length of 5 for column 'name' at undefined.",
         );
     });
@@ -617,9 +598,8 @@ describe('ColumnDefinitionAST parse method', () => {
             new LiteralToken("'AB'"),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        const parsedColumn = new ColumnDefinitionParser(tokens);
+        expect(() => parsedColumn.parse()).toThrow(
             "Default value 'AB' exceeds the defined length of 1 for column 'initial' at undefined.",
         );
     });
@@ -632,10 +612,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new NumberToken('123'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
+        const parsedColumn = new ColumnDefinitionParser(tokens);
 
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(() => parsedColumn.parse()).toThrow(
             "Expected date/time string default value for column 'created_at', but found '123' at undefined.",
         );
     });
@@ -648,10 +627,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new NumberToken('123'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
+        const parsedColumn = new ColumnDefinitionParser(tokens);
 
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(() => parsedColumn.parse()).toThrow(
             "Expected date/time string default value for column 'created_at', but found '123' at undefined.",
         );
     });
@@ -664,10 +642,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new NumberToken('123'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const parsedColumn = new ColumnDefinition();
+        const parsedColumn = new ColumnDefinitionParser(tokens);
 
-        expect(() => parsedColumn.parse(parserGenerator)).toThrow(
+        expect(() => parsedColumn.parse()).toThrow(
             "Cannot set default value for column 'id' of type SERIAL.",
         );
     });
@@ -680,12 +657,9 @@ describe('ColumnDefinitionAST parse method', () => {
             new KeywordToken('NULL'),
             new KeywordToken('UNIQUE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const columnDefinitionAST = new ColumnDefinition();
+        const columnDefinitionAST = new ColumnDefinitionParser(tokens);
 
-        const parsedColumn = columnDefinitionAST.parse(
-            parserGenerator,
-        ) as ColumnDefinition;
+        const parsedColumn = columnDefinitionAST.parse() as ColumnDefinition;
 
         expect(parsedColumn.name).toBe('id');
         expect(parsedColumn.datatype).toBe(DatatypeEnum.INT);
@@ -697,20 +671,18 @@ describe('ColumnDefinitionAST parse method', () => {
 describe('CreateTableAST parse method', () => {
     it('should throw an error for missing TABLE keyword', () => {
         const tokens = [new KeywordToken('CREATE')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const createTableAST = new CreateTableAST();
+        const createTableParser = new CreateParser(tokens);
 
-        expect(() => createTableAST.parse(parserGenerator)).toThrow(
+        expect(() => createTableParser.parse()).toThrow(
             "Expected 'TABLE' after 'CREATE', but found end of input.",
         );
     });
 
     it('should throw an error for missing table name', () => {
         const tokens = [new KeywordToken('CREATE'), new KeywordToken('TABLE')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const createTableAST = new CreateTableAST();
+        const createTableParser = new CreateParser(tokens);
 
-        expect(() => createTableAST.parse(parserGenerator)).toThrow(
+        expect(() => createTableParser.parse()).toThrow(
             "Expected table name after 'CREATE TABLE', but found end of input.",
         );
     });
@@ -721,10 +693,9 @@ describe('CreateTableAST parse method', () => {
             new KeywordToken('TABLE'),
             new IdentifierToken('my_table'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const createTableAST = new CreateTableAST();
+        const createTableParser = new CreateParser(tokens);
 
-        expect(() => createTableAST.parse(parserGenerator)).toThrow(
+        expect(() => createTableParser.parse()).toThrow(
             "Expected '(' after table name, but found end of input.",
         );
     });
@@ -737,10 +708,9 @@ describe('CreateTableAST parse method', () => {
             new PunctuationToken('('),
             new PunctuationToken(')'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const createTableAST = new CreateTableAST();
+        const createTableParser = new CreateParser(tokens);
 
-        expect(() => createTableAST.parse(parserGenerator)).toThrow(
+        expect(() => createTableParser.parse()).toThrow(
             "Expected at least one column definition for table 'my_table', but found ')' at undefined.",
         );
     });
@@ -757,10 +727,9 @@ describe('CreateTableAST parse method', () => {
             new DatatypeToken('VARCHAR'),
             new PunctuationToken(')'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const createTableAST = new CreateTableAST();
+        const createTableParser = new CreateParser(tokens);
 
-        expect(() => createTableAST.parse(parserGenerator)).toThrow(
+        expect(() => createTableParser.parse()).toThrow(
             "Expected ',' after column definition for table 'my_table', but found 'name' at undefined.",
         );
     });
@@ -787,12 +756,8 @@ describe('CreateTableAST parse method', () => {
             new PunctuationToken(')'),
             new PunctuationToken(';'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const createTableAST = new CreateTableAST();
 
-        const parsedAST = createTableAST.parse(
-            parserGenerator,
-        ) as CreateTableAST;
+        const parsedAST = new CreateParser(tokens).parse() as CreateTableAST;
 
         expect(parsedAST.tableName).toBe('my_table');
         expect(parsedAST.columns.length).toBe(3);
@@ -835,10 +800,9 @@ describe('CreateTableAST parse method', () => {
             new DatatypeToken('TIMESTAMP'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const createTableAST = new CreateTableAST();
+        const createTableParser = new CreateParser(tokens);
 
-        expect(() => createTableAST.parse(parserGenerator)).toThrow(
+        expect(() => createTableParser.parse()).toThrow(
             "Expected ')' after column definitions for table 'my_table', but found end of input.",
         );
     });
@@ -865,10 +829,9 @@ describe('CreateTableAST parse method', () => {
             new KeywordToken('WHERE'),
         ];
 
-        const parserGenerator = new ParserGenerator(tokens);
-        const createTableAST = new CreateTableAST();
+        const createTableParser = new CreateParser(tokens);
 
-        expect(() => createTableAST.parse(parserGenerator)).toThrow(
+        expect(() => createTableParser.parse()).toThrow(
             "Unexpected token 'WHERE' after CREATE TABLE statement at undefined.",
         );
     });
@@ -881,10 +844,9 @@ describe('DropTableAST parse method', () => {
 
     it('should throw an error for missing table name', () => {
         const tokens = [new KeywordToken('DROP'), new KeywordToken('TABLE')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const dropTableAST = new DropTableAST();
+        const dropTableParser = new DropParser(tokens);
 
-        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+        expect(() => dropTableParser.parse()).toThrow(
             "Expected table name after 'DROP TABLE', but found end of input.",
         );
     });
@@ -895,10 +857,9 @@ describe('DropTableAST parse method', () => {
             new KeywordToken('TABLE'),
             new IdentifierToken('my_table'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const dropTableAST = new DropTableAST();
+        const dropTableParser = new DropParser(tokens);
 
-        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+        expect(() => dropTableParser.parse()).toThrow(
             "Expected ';' after 'DROP TABLE my_table', but found end of input.",
         );
     });
@@ -911,10 +872,9 @@ describe('DropTableAST parse method', () => {
             new PunctuationToken(';'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const dropTableAST = new DropTableAST();
+        const dropTableParser = new DropParser(tokens);
 
-        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+        expect(() => dropTableParser.parse()).toThrow(
             "Unexpected token 'WHERE' after DROP TABLE statement at undefined.",
         );
     });
@@ -926,10 +886,9 @@ describe('DropTableAST parse method', () => {
             new IdentifierToken('my_table'),
             new PunctuationToken(';'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const dropTableAST = new DropTableAST();
+        const dropTableParser = new DropParser(tokens);
 
-        const parsedAST = dropTableAST.parse(parserGenerator) as DropTableAST;
+        const parsedAST = dropTableParser.parse() as DropTableAST;
 
         expect(parsedAST.tableName).toBe('my_table');
     });
@@ -942,10 +901,9 @@ describe('DropTableAST parse method', () => {
             new PunctuationToken(';'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const dropTableAST = new DropTableAST();
+        const dropTableParser = new DropParser(tokens);
 
-        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+        expect(() => dropTableParser.parse()).toThrow(
             "Unexpected token 'WHERE' after DROP TABLE statement at undefined.",
         );
     });
@@ -956,10 +914,9 @@ describe('DropTableAST parse method', () => {
             new KeywordToken('TABLE'),
             new KeywordToken('IF'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const dropTableAST = new DropTableAST();
+        const dropTableParser = new DropParser(tokens);
 
-        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+        expect(() => dropTableParser.parse()).toThrow(
             "Expected 'EXISTS' after 'IF' in DROP TABLE statement, but found end of input.",
         );
     });
@@ -971,10 +928,9 @@ describe('DropTableAST parse method', () => {
             new KeywordToken('IF'),
             new KeywordToken('EXISTS'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const dropTableAST = new DropTableAST();
+        const dropTableParser = new DropParser(tokens);
 
-        expect(() => dropTableAST.parse(parserGenerator)).toThrow(
+        expect(() => dropTableParser.parse()).toThrow(
             "Expected table name after 'DROP TABLE IF EXISTS', but found end of input.",
         );
     });
@@ -988,16 +944,20 @@ describe('DropTableAST parse method', () => {
             new IdentifierToken('my_table'),
             new PunctuationToken(';'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const dropTableAST = new DropTableAST();
+        const dropTableParser = new DropParser(tokens);
 
-        const parsedAST = dropTableAST.parse(parserGenerator) as DropTableAST;
+        const parsedAST = dropTableParser.parse() as DropTableAST;
 
         expect(parsedAST.tableName).toBe('my_table');
         expect(parsedAST.ifExists).toBe(true);
     });
 });
 
+describe('InsertAST parse method', () => {
+    it('should be defined', () => {
+        expect(new InsertAST()).toBeDefined();
+    });
+});
 describe('UpdateAST parse method', () => {
     it('should be defined', () => {
         expect(new UpdateAST()).toBeDefined();
@@ -1005,10 +965,9 @@ describe('UpdateAST parse method', () => {
 
     it('should throw an error for missing table name', () => {
         const tokens = [new KeywordToken('UPDATE')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const updateAST = new UpdateAST();
+        const updateParser = new UpdateParser(tokens);
 
-        expect(() => updateAST.parse(parserGenerator)).toThrow(
+        expect(() => updateParser.parse()).toThrow(
             "Expected 'TABLE_NAME' after 'UPDATE', but found end of input.",
         );
     });
@@ -1018,10 +977,9 @@ describe('UpdateAST parse method', () => {
             new KeywordToken('UPDATE'),
             new IdentifierToken('users'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const updateAST = new UpdateAST();
+        const updateParser = new UpdateParser(tokens);
 
-        expect(() => updateAST.parse(parserGenerator)).toThrow(
+        expect(() => updateParser.parse()).toThrow(
             "Expected 'SET' after 'UPDATE users', but found end of input.",
         );
     });
@@ -1032,10 +990,9 @@ describe('UpdateAST parse method', () => {
             new IdentifierToken('users'),
             new KeywordToken('SET'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const updateAST = new UpdateAST();
+        const updateParser = new UpdateParser(tokens);
 
-        expect(() => updateAST.parse(parserGenerator)).toThrow(
+        expect(() => updateParser.parse()).toThrow(
             'Expected at least one column assignment in UPDATE statement, but found none.',
         );
     });
@@ -1049,10 +1006,9 @@ describe('UpdateAST parse method', () => {
             new SingleCharacterOperatorToken('='),
             new NumberToken('42'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const updateAST = new UpdateAST();
+        const updateParser = new UpdateParser(tokens);
 
-        expect(() => updateAST.parse(parserGenerator)).toThrow(
+        expect(() => updateParser.parse()).toThrow(
             "Expected 'WHERE' after 'COLUMN_ASSIGNMENT', but found end of input.",
         );
     });
@@ -1070,10 +1026,9 @@ describe('UpdateAST parse method', () => {
             new SingleCharacterOperatorToken('='),
             new NumberToken('1'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const updateAST = new UpdateAST();
+        const updateParser = new UpdateParser(tokens);
 
-        expect(() => updateAST.parse(parserGenerator)).toThrow(
+        expect(() => updateParser.parse()).toThrow(
             "Expected ';' after 'WHERE id = 1', but found end of input.",
         );
     });
@@ -1093,16 +1048,15 @@ describe('UpdateAST parse method', () => {
             new PunctuationToken(';'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const updateAST = new UpdateAST();
+        const updateParser = new UpdateParser(tokens);
 
-        expect(() => updateAST.parse(parserGenerator)).toThrow(
+        expect(() => updateParser.parse()).toThrow(
             "Unexpected token 'WHERE' after UPDATE Statement at undefined.",
         );
     });
 
     it('should collect column assignments in an UPDATE statement', () => {
-        const parserGenerator = new ParserGenerator([
+        const tokens = [
             new KeywordToken('UPDATE'),
             new IdentifierToken('users'),
             new KeywordToken('SET'),
@@ -1118,9 +1072,9 @@ describe('UpdateAST parse method', () => {
             new SingleCharacterOperatorToken('='),
             new NumberToken('1'),
             new PunctuationToken(';'),
-        ]);
+        ];
 
-        const updateAST = new UpdateAST().parse(parserGenerator) as UpdateAST;
+        const updateAST = new UpdateParser(tokens).parse() as UpdateAST;
 
         expect(updateAST.columns).toEqual([
             { column: 'age', value: 42, isNull: false },
@@ -1136,10 +1090,9 @@ describe('DeleteAST parse method', () => {
 
     it('should throw an EOI error for missing FROM key word', () => {
         const tokens = [new KeywordToken('DELETE')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const deleteAST = new DeleteAST();
+        const deleteParser = new DeleteParser(tokens);
 
-        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+        expect(() => deleteParser.parse()).toThrow(
             "Expected 'FROM' after 'DELETE', but found end of input.",
         );
     });
@@ -1150,10 +1103,9 @@ describe('DeleteAST parse method', () => {
             new KeywordToken('FROM'),
             new KeywordToken('Where'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const deleteAST = new DeleteAST();
+        const deleteParser = new DeleteParser(tokens);
 
-        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+        expect(() => deleteParser.parse()).toThrow(
             "Expected 'table name' after 'DELETE FROM', but found 'Where' at undefined.",
         );
     });
@@ -1165,10 +1117,9 @@ describe('DeleteAST parse method', () => {
             new IdentifierToken('test'),
             new PunctuationToken(';'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const deleteAST = new DeleteAST();
+        const deleteParser = new DeleteParser(tokens);
 
-        expect(() => deleteAST.parse(parserGenerator)).not.toThrow();
+        expect(() => deleteParser.parse()).not.toThrow();
     });
 
     it('should throw an EOI error for missing semicolon', () => {
@@ -1177,10 +1128,9 @@ describe('DeleteAST parse method', () => {
             new KeywordToken('FROM'),
             new IdentifierToken('test'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const deleteAST = new DeleteAST();
+        const deleteParser = new DeleteParser(tokens);
 
-        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+        expect(() => deleteParser.parse()).toThrow(
             "Expected 'WHERE' or ';' after 'DELETE FROM test', but found end of input.",
         );
     });
@@ -1196,10 +1146,9 @@ describe('DeleteAST parse method', () => {
             new NumberToken('5'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const deleteAST = new DeleteAST();
+        const deleteParser = new DeleteParser(tokens);
 
-        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+        expect(() => deleteParser.parse()).toThrow(
             "Expected ';' after 'DELETE FROM test WHERE id = 5', but found 'WHERE' at undefined.",
         );
     });
@@ -1212,10 +1161,9 @@ describe('DeleteAST parse method', () => {
             new PunctuationToken(';'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const deleteAST = new DeleteAST();
+        const deleteParser = new DeleteParser(tokens);
 
-        expect(() => deleteAST.parse(parserGenerator)).toThrow(
+        expect(() => deleteParser.parse()).toThrow(
             "Unexpected token 'WHERE' after DELETE Statement at undefined.",
         );
     });
@@ -1231,10 +1179,9 @@ describe('DeleteAST parse method', () => {
             new NumberToken('5'),
             new PunctuationToken(';'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const deleteAST = new DeleteAST();
+        const deleteParser = new DeleteParser(tokens);
 
-        const ast = deleteAST.parse(parserGenerator) as DeleteAST;
+        const ast = deleteParser.parse() as DeleteAST;
         expect(ast.tableName).toBe('test');
         expect(ast.whereCondition).toBeDefined();
         expect(ast.whereCondition?.leftOperand).toBe('id');
@@ -1252,10 +1199,9 @@ describe('SelectAST parse method', () => {
 
     it('should throw an error for missing FROM keyword', () => {
         const tokens = [new KeywordToken('SELECT'), new IdentifierToken('id')];
-        const parserGenerator = new ParserGenerator(tokens);
-        const selectAST = new SelectAST();
+        const selectParser = new SelectParser(tokens);
 
-        expect(() => selectAST.parse(parserGenerator)).toThrow(
+        expect(() => selectParser.parse()).toThrow(
             "Expected 'FROM' after 'SELECT id', but found end of input.",
         );
     });
@@ -1266,10 +1212,9 @@ describe('SelectAST parse method', () => {
             new IdentifierToken('id'),
             new KeywordToken('FROM'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const selectAST = new SelectAST();
+        const selectParser = new SelectParser(tokens);
 
-        expect(() => selectAST.parse(parserGenerator)).toThrow(
+        expect(() => selectParser.parse()).toThrow(
             "Expected 'TABLE_NAME' after 'FROM', but found end of input.",
         );
     });
@@ -1281,10 +1226,9 @@ describe('SelectAST parse method', () => {
             new KeywordToken('FROM'),
             new IdentifierToken('users'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const selectAST = new SelectAST();
+        const selectParser = new SelectParser(tokens);
 
-        expect(() => selectAST.parse(parserGenerator)).toThrow(
+        expect(() => selectParser.parse()).toThrow(
             "Expected ';' after 'SELECT statement', but found end of input.",
         );
     });
@@ -1298,10 +1242,9 @@ describe('SelectAST parse method', () => {
             new PunctuationToken(';'),
             new KeywordToken('WHERE'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const selectAST = new SelectAST();
+        const selectParser = new SelectParser(tokens);
 
-        expect(() => selectAST.parse(parserGenerator)).toThrow(
+        expect(() => selectParser.parse()).toThrow(
             "Unexpected token 'WHERE' after SELECT statement at undefined.",
         );
     });
@@ -1324,10 +1267,9 @@ describe('SelectAST parse method', () => {
             new KeywordToken('ASC'),
             new PunctuationToken(';'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const selectAST = new SelectAST();
+        const selectParser = new SelectParser(tokens);
 
-        const parsedAST = selectAST.parse(parserGenerator) as SelectAST;
+        const parsedAST = selectParser.parse() as SelectAST;
 
         expect(parsedAST.selectColumns).toEqual([
             { name: 'id' },
@@ -1352,10 +1294,9 @@ describe('SelectAST parse method', () => {
             new IdentifierToken('users'),
             new PunctuationToken(';'),
         ];
-        const parserGenerator = new ParserGenerator(tokens);
-        const selectAST = new SelectAST();
+        const selectParser = new SelectParser(tokens);
 
-        const parsedAST = selectAST.parse(parserGenerator) as SelectAST;
+        const parsedAST = selectParser.parse() as SelectAST;
 
         expect(parsedAST.selectColumns).toBe('*');
         expect(parsedAST.from).toEqual([{ tableName: 'users' }]);

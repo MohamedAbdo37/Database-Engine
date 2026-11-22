@@ -1,7 +1,8 @@
 import { Catalog } from '../../../storage/dto/catalog.dto.js';
 import { SyntaxErrorException } from '../../exceptions/syntax-error.exc.js';
 import { Token } from '../../tokenizer/token.class.js';
-import { Parser, ParserGenerator } from '../parser.js';
+import { ParserGenerator } from '../parsers/parser-generator.parser.js';
+import { Parser } from '../parser.class.js';
 
 export enum DDLType {
     CREATE_TABLE = 'CREATE_TABLE',
@@ -16,10 +17,8 @@ export enum DMLType {
     DELETE = 'DELETE',
 }
 
-export abstract class AST implements Parser {
-    public abstract parse(parser: ParserGenerator): AST | null;
-
-    protected missedTokenError(
+export abstract class AST {
+    public missedTokenError(
         expectedToken: string,
         foundToken: string | null,
         foundTokenPosition: string | null,

@@ -15,6 +15,15 @@ export interface StandardErrorResponse {
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+    private isSQLEngineException(exception: any): boolean {
+        return (
+            exception instanceof Error &&
+            (exception.name === 'SyntaxErrorException' ||
+                exception.name === 'ExecutionErrorException' ||
+                exception.name === 'DatatypeException' ||
+                exception.name === 'SyntaxError')
+        );
+    }
     catch(exception: any, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
         const response = ctx.getResponse();
@@ -23,13 +32,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
         let message = exception?.message || 'Internal Server Error';
         let error = 'InternalServerError';
 
-        if (
-            exception instanceof Error &&
-            (exception.name === 'SyntaxErrorException' ||
-                exception.name === 'ExecutionErrorException' ||
-                exception.name === 'DatatypeException' ||
-                exception.name === 'SyntaxError')
-        ) {
+        if (this.isSQLEngineException(exception)) {
             statusCode = HttpStatus.BAD_REQUEST;
             error = exception.name;
         }

@@ -121,11 +121,7 @@ export class InsertValidator implements ValidatorIF {
         column: InsertColumn,
         schemaColumn: CatalogColumn,
     ): void {
-        if (
-            column.isNullable &&
-            !schemaColumn.isNullable &&
-            schemaColumn.defaultValue === null
-        ) {
+        if (column.isNullable && !schemaColumn.isNullable) {
             throw new ExecutionErrorException(
                 `Column '${column.name}' cannot be null in table '${tableName}'.`,
             );

@@ -14,9 +14,6 @@ export class DropValidator implements ValidatorIF {
 
         if (!isTableExists) {
             if (ast.ifExists) {
-                console.log(
-                    `Table '${ast.tableName}' does not exist. Skipping drop as 'IF EXISTS' clause is specified.`,
-                );
                 return;
             }
 

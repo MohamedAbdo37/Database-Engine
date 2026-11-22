@@ -19,6 +19,16 @@ export class ApiResponseInterceptor<T> implements NestInterceptor<
     T,
     StandardResponse<T>
 > {
+    private isHaveMessageProperty(data: any): boolean {
+        return (
+            data &&
+            typeof data === 'object' &&
+            'data' in data &&
+            'message' in data &&
+            Object.keys(data).length === 2 &&
+            typeof data.message === 'string'
+        );
+    }
     intercept(
         context: ExecutionContext,
         next: CallHandler<any>,
@@ -28,13 +38,7 @@ export class ApiResponseInterceptor<T> implements NestInterceptor<
 
         return next.handle().pipe(
             map((data) => {
-                if (
-                    data &&
-                    typeof data === 'object' &&
-                    'data' in data &&
-                    'message' in data &&
-                    Object.keys(data).length === 2
-                ) {
+                if (this.isHaveMessageProperty(data)) {
                     return {
                         success: true,
                         data: data.data,

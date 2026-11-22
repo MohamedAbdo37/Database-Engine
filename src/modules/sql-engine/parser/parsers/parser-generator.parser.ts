@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SyntaxErrorException } from '../exceptions/syntax-error.exc.js';
+import { SyntaxErrorException } from '../../exceptions/syntax-error.exc.js';
 import {
     KeywordToken,
     MultiCharacterOperatorToken,
@@ -8,61 +8,21 @@ import {
     SingleCharacterOperatorToken,
     Token,
     TokenType,
-} from '../tokenizer/token.class.js';
-import { AST } from './ast/ast.class.js';
-import { CreateTableAST } from './ast/ddl/create-table.ast.js';
-import { DropTableAST } from './ast/ddl/drop-table.ast.js';
-import { InsertAST } from './ast/dml/insert.ast.js';
-import { UpdateAST } from './ast/dml/update.ast.js';
-import { DeleteAST } from './ast/dml/delete.ast.js';
-import { SelectAST } from './ast/select.class.js';
-
-export interface Parser {
-    parse(parserGenerator: ParserGenerator): AST | null;
-}
+} from '../../tokenizer/token.class.js';
+import { AST } from '../ast/ast.class.js';
+import { SelectAST } from '../ast/select.class.js';
+import { Parser } from '../parser.class.js';
+import { CreateParser } from './create.parser.js';
+import { DropParser } from './drop.pareser.js';
+import { InsertParser } from './insert.parser.js';
+import { UpdateParser } from './update.parser.js';
+import { DeleteParser } from './delete.parser.js';
+import { SelectParser } from './select.parser.js';
 
 @Injectable()
-export class ParserGenerator {
-    private tokens: Token[] = [];
-
+export class ParserGenerator extends Parser {
     constructor(tokens: Token[]) {
-        this.tokens = [...tokens];
-    }
-
-    public peek(id?: number): Token | null {
-        if (id !== undefined && id >= 0 && id < this.tokens.length) {
-            return this.tokens[id];
-        } else if (this.tokens.length > 0) {
-            return this.tokens[0];
-        }
-        return null;
-    }
-
-    public next(id?: number): Token | null {
-        if (id !== undefined && id >= 0 && id < this.tokens.length) {
-            return this.tokens[id + 1] || null;
-        } else if (this.tokens.length > 1) {
-            return this.tokens[1] || null;
-        }
-        return null;
-    }
-
-    public consume(id?: number): Token | null {
-        if (id !== undefined && id >= 0 && id < this.tokens.length) {
-            return this.tokens.splice(id, 1)[0] || null;
-        } else if (this.tokens.length > 0) {
-            return this.tokens.shift() || null;
-        }
-        return null;
-    }
-
-    public expect(expectedToken: Token, id?: number): boolean {
-        if (id !== undefined && id >= 0 && id < this.tokens.length) {
-            const token = this.tokens[id];
-            return token !== null && token.equals(expectedToken);
-        }
-        const token = this.peek();
-        return token !== null && token.equals(expectedToken);
+        super(tokens);
     }
 
     public parse(): AST | null {
@@ -74,26 +34,45 @@ export class ParserGenerator {
         }
 
         this.cleanTokens();
-
+        let consumedTokens = 0;
+        const remainingBefore = this.tokens.length;
         let ast: AST | null = null;
         switch (true) {
             case new KeywordToken('CREATE').equals(token):
-                ast = new CreateTableAST().parse(this);
+                const createParser = new CreateParser(this.tokens);
+                ast = createParser.parse();
+                consumedTokens = remainingBefore - createParser.tokens.length;
+                this.consume(0, consumedTokens);
                 break;
             case new KeywordToken('DROP').equals(token):
-                ast = new DropTableAST().parse(this);
+                const dropParser = new DropParser(this.tokens);
+                ast = dropParser.parse();
+                consumedTokens = remainingBefore - dropParser.tokens.length;
+                this.consume(0, consumedTokens);
                 break;
             case new KeywordToken('INSERT').equals(token):
-                ast = new InsertAST().parse(this);
+                const insertParser = new InsertParser(this.tokens);
+                ast = insertParser.parse();
+                consumedTokens = remainingBefore - insertParser.tokens.length;
+                this.consume(0, consumedTokens);
                 break;
             case new KeywordToken('UPDATE').equals(token):
-                ast = new UpdateAST().parse(this);
+                const updateParser = new UpdateParser(this.tokens);
+                ast = updateParser.parse();
+                consumedTokens = remainingBefore - updateParser.tokens.length;
+                this.consume(0, consumedTokens);
                 break;
             case new KeywordToken('DELETE').equals(token):
-                ast = new DeleteAST().parse(this);
+                const deleteParser = new DeleteParser(this.tokens);
+                ast = deleteParser.parse();
+                consumedTokens = remainingBefore - deleteParser.tokens.length;
+                this.consume(0, consumedTokens);
                 break;
             case new KeywordToken('SELECT').equals(token):
-                ast = new SelectAST().parse(this);
+                const selectParser = new SelectParser(this.tokens);
+                ast = selectParser.parse();
+                consumedTokens = remainingBefore - selectParser.tokens.length;
+                this.consume(0, consumedTokens);
                 break;
             default:
                 throw new SyntaxErrorException(
@@ -121,16 +100,7 @@ export class ParserGenerator {
 
         while (id < this.tokens.length) {
             if (this.isExpressionToken(id)) {
-                if (
-                    containsUnresolvedOperands &&
-                    this.tokens
-                        .slice(id)
-                        .some(
-                            (token) =>
-                                token.type === TokenType.IDENTIFIER ||
-                                token.type === TokenType.LITERAL,
-                        )
-                ) {
+                if (this.isExpression(id, containsUnresolvedOperands)) {
                     id++;
                     continue;
                 }
@@ -196,9 +166,26 @@ export class ParserGenerator {
         );
     }
 
+    private isExpression(
+        id: number,
+        containsUnresolvedOperands: boolean,
+    ): boolean {
+        return (
+            containsUnresolvedOperands &&
+            this.tokens
+                .slice(id)
+                .some(
+                    (token) =>
+                        token.type === TokenType.IDENTIFIER ||
+                        token.type === TokenType.LITERAL,
+                )
+        );
+    }
+
     private isBooleanExpression(id: number): boolean {
         let parenthesisDepth = 0;
-        for (const token of this.tokens.slice(id)) {
+        const tokensToCheck = this.tokens.slice(id);
+        for (const token of tokensToCheck) {
             if (token.equals(new PunctuationToken('('))) {
                 parenthesisDepth++;
                 continue;

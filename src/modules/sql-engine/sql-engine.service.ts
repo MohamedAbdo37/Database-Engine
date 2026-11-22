@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Tokenizer } from './tokenizer/tokenizer.js';
-import { ParserGenerator } from './parser/parser.js';
+import { ParserGenerator } from './parser/parsers/parser-generator.parser.js';
 import { Executor } from './executor/executor.js';
 import { DDLType, DMLType, MainClassAST } from './parser/ast/ast.class.js';
 import { Validator } from './validator/validator.js';
@@ -16,6 +16,14 @@ export class SqlEngineService {
         private readonly logger: Logger,
     ) {}
 
+    private isDDLQuery(ast: MainClassAST): boolean {
+        return Object.values(DDLType).includes(ast.type as DDLType);
+    }
+
+    private isDMLQuery(ast: MainClassAST): boolean {
+        return Object.values(DMLType).includes(ast.type as DMLType);
+    }
+
     async executeDDL(query: string): Promise<string> {
         let result: string = '';
 
@@ -24,7 +32,7 @@ export class SqlEngineService {
 
             const ast = new ParserGenerator(tokens).parse() as MainClassAST;
 
-            if (!Object.values(DDLType).includes(ast.type as DDLType)) {
+            if (!this.isDDLQuery(ast)) {
                 throw new BadRequestException(
                     `Expected DDL AST, but got ${ast.type}`,
                 );
@@ -52,7 +60,7 @@ export class SqlEngineService {
             const tokens = this.tokenizer.tokenize(query);
             const ast = new ParserGenerator(tokens).parse() as MainClassAST;
 
-            if (!Object.values(DMLType).includes(ast.type as DMLType)) {
+            if (!this.isDMLQuery(ast)) {
                 throw new BadRequestException(
                     `Expected DML AST, but got ${ast.type}`,
                 );
