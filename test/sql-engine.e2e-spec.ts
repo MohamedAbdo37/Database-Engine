@@ -1029,4 +1029,107 @@ describe('SQL Engine E2E Tests', () => {
             .expect(200);
         assertSuccess(dropRes.body, 200);
     });
+
+    it('enforces NOT NULL and applies DEFAULT values across CREATE TABLE, INSERT, and UPDATE', async () => {
+        const server = app.getHttpServer();
+        const expectedErrorStatus = 400; // Adjust if your constraint validator returns another 4xx status
+
+        // 1. CREATE TABLE with NOT NULL and DEFAULT constraints
+        const createRes = await request(server)
+            .post('/execute/ddl')
+            .send({
+                query:
+                    'CREATE TABLE profiles (' +
+                    'id INT NOT NULL, ' +
+                    "role VARCHAR(50) NOT NULL DEFAULT 'member', " +
+                    'credits INT DEFAULT 10, ' +
+                    'bio VARCHAR(255)' +
+                    ');',
+            })
+            .expect(200);
+        assertSuccess(createRes.body, 200);
+
+        // 2. INSERT omitting defaulted columns -> applies DEFAULT values
+        const insertDefaultsRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO profiles (id, bio) VALUES (1, 'Backend dev');",
+            })
+            .expect(200);
+        assertSuccess(insertDefaultsRes.body, 200);
+
+        // 3. INSERT with explicit values overriding DEFAULTs and nullable column left NULL
+        const insertExplicitRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO profiles (id, role, credits, bio) VALUES (2, 'admin', 50, NULL);",
+            })
+            .expect(200);
+        assertSuccess(insertExplicitRes.body, 200);
+
+        // 4. INSERT violating NOT NULL by passing NULL into a NOT NULL column -> error
+        const insertNullNotNullRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO profiles (id, role, credits, bio) VALUES (3, NULL, 20, 'Test');",
+            })
+            .expect(expectedErrorStatus);
+        assertError(insertNullNotNullRes.body, expectedErrorStatus);
+
+        // 5. INSERT omitting a NOT NULL column that has NO DEFAULT -> error
+        const insertMissingNotNullRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "INSERT INTO profiles (role, credits) VALUES ('member', 10);",
+            })
+            .expect(expectedErrorStatus);
+        assertError(insertMissingNotNullRes.body, expectedErrorStatus);
+
+        // 6. SELECT after inserts to verify DEFAULTs and NULLs
+        const selectAfterInsert = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM profiles;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectAfterInsert.body, 200);
+        expect(selectAfterInsert.body.data).toEqual([
+            { id: 1, role: 'member', credits: 10, bio: 'Backend dev' },
+            { id: 2, role: 'admin', credits: 50, bio: null },
+        ]);
+
+        // 7. UPDATE valid values (including updating nullable column and non-null column)
+        const updateValidRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: "UPDATE profiles SET credits = 25, bio = 'Updated bio' WHERE id = 1;",
+            })
+            .expect(200);
+        assertSuccess(updateValidRes.body, 200);
+
+        // 8. UPDATE violating NOT NULL by setting a NOT NULL column to NULL -> error
+        const updateNullNotNullRes = await request(server)
+            .post('/execute/dml')
+            .send({
+                query: 'UPDATE profiles SET role = NULL WHERE id = 1;',
+            })
+            .expect(expectedErrorStatus);
+        assertError(updateNullNotNullRes.body, expectedErrorStatus);
+
+        // 9. SELECT final state and confirm failed UPDATE did not corrupt row 1
+        const selectFinal = await request(server)
+            .post('/execute/dml')
+            .send({ query: 'SELECT * FROM profiles;' })
+            .expect(200);
+        assertSuccess<Record<string, unknown>[]>(selectFinal.body, 200);
+        expect(selectFinal.body.data).toEqual([
+            { id: 1, role: 'member', credits: 25, bio: 'Updated bio' },
+            { id: 2, role: 'admin', credits: 50, bio: null },
+        ]);
+
+        // 10. Clean up table
+        const dropRes = await request(server)
+            .post('/execute/ddl')
+            .send({ query: 'DROP TABLE profiles;' })
+            .expect(200);
+        assertSuccess(dropRes.body, 200);
+    });
 });
