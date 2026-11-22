@@ -33,32 +33,32 @@ export class Tokenizer {
             .filter((token): token is Token => token !== null);
     }
 
-    public tokenize(rowSQL: string): Token[] {
+    public tokenize(rawSQL: string): Token[] {
         const tokens: Token[] = [];
-        const lines = rowSQL.trim().split('\n');
+        const lines = rawSQL.trim().split('\n');
 
         for (let [idx, line] of lines.entries()) {
-            let curser = 0;
+            let cursor = 0;
             line = line.trim();
-            while (curser < line.length) {
-                const tokenText = line.slice(curser);
+            while (cursor < line.length) {
+                const tokenText = line.slice(cursor);
 
                 const matchingTokens = this.isMatchingToken(tokenText);
                 if (matchingTokens.length > 0) {
                     const matchedToken = matchingTokens[0];
-                    matchedToken.setPosition(idx + 1, curser + 1);
+                    matchedToken.setPosition(idx + 1, cursor + 1);
                     tokens.push(matchedToken);
-                    curser += matchedToken.length;
+                    cursor += matchedToken.length;
                     continue;
                 }
                 if (!this.whitespaceRegex.test(tokenText)) {
                     throw new UnexpectedTokenException(
                         tokenText[0],
                         idx + 1,
-                        curser + 1,
+                        cursor + 1,
                     );
                 }
-                curser++;
+                cursor++;
             }
         }
 

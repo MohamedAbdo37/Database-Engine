@@ -40,7 +40,6 @@ export class SqlEngineService {
             throw error;
         }
 
-        console.log(`Executed DDL query: \n${query} \nsuccessfully.`);
         await this.logger.logSuccessDDL(query);
         return result;
     }
@@ -65,8 +64,6 @@ export class SqlEngineService {
             await this.logger.logErrorDML(query, error as Error);
             throw error;
         }
-
-        console.log(`Executed DML query: \n${query} \nsuccessfully.`);
 
         await this.logger.logSuccessDML(query);
 

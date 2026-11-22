@@ -14,7 +14,6 @@ import { DML } from './dml.class.js';
 import { WhereClauseAST } from './where-clause.ast.js';
 
 export class DeleteAST extends DML {
-    private parser: ParserGenerator;
     private _whereCondition: WhereClauseAST | null;
 
     public get whereCondition(): WhereClauseAST | null {
@@ -26,22 +25,6 @@ export class DeleteAST extends DML {
 
     constructor() {
         super(DMLType.DELETE);
-    }
-
-    private peek(): Token | null {
-        return this.parser.peek();
-    }
-
-    private consume(): Token | null {
-        return this.parser.consume();
-    }
-
-    private next(): Token | null {
-        return this.parser.next();
-    }
-
-    private expect(token: Token): boolean {
-        return this.parser.expect(token);
     }
 
     private parseCondition(): void {

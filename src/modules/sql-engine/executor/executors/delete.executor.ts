@@ -21,7 +21,7 @@ export class DeleteExecutor implements ExecutorIF {
         let leftOperandValue: any;
 
         if (ast.whereCondition.isRightOperandColumn)
-            rightOperandValue = ast.whereCondition.leftOperand as Column;
+            rightOperandValue = ast.whereCondition.rightOperand as Column;
         else rightOperandValue = ast.whereCondition.rightOperand;
 
         if (ast.whereCondition.isLeftOperandColumn)

@@ -1,13 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TableManager } from '../../../storage/table-manager/table-manager.js';
 import { Validator, ValidatorIF } from '../validator.js';
-import {
-    FromClause,
-    SelectAST,
-    SelectClause,
-} from '../../parser/ast/select.class.js';
+import { SelectAST } from '../../parser/ast/select.class.js';
 import { ExecutionErrorException } from '../../exceptions/execution-error.exc.js';
 import { WhereClauseAST } from '../../parser/ast/dml/where-clause.ast.js';
+import { FromClause } from '../../parser/ast/ast.class.js';
 
 @Injectable()
 export class SelectValidator implements ValidatorIF {

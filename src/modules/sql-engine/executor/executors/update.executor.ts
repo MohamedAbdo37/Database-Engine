@@ -38,10 +38,16 @@ export class UpdateExecutor implements ExecutorIF {
                     columnAssignment.column,
                 );
 
+                if (!schemaColumn) {
+                    throw new ExecutionErrorException(
+                        `Column '${columnAssignment.column}' does not exist in table '${ast.tableName}'.`,
+                    );
+                }
+
                 try {
-                    row.data[schemaColumn!.id] = Datatype.getDatatypeInstance(
-                        schemaColumn!.datatype,
-                        schemaColumn!.value,
+                    row.data[schemaColumn.id] = Datatype.getDatatypeInstance(
+                        schemaColumn.datatype,
+                        schemaColumn.value,
                         columnAssignment.value,
                         columnAssignment.isNull,
                     );

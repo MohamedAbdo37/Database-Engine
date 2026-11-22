@@ -12,12 +12,6 @@ export enum DatatypeEnum {
 }
 
 export abstract class Datatype<T> {
-    static CHAR(executor: any, CHAR: any, arg2: number, arg3: string): any {
-        throw new Error('Method not implemented.');
-    }
-    static serialize(): any {
-        throw new Error('Method not implemented.');
-    }
     protected _value: T;
     private _type: DatatypeEnum;
     private _size: number;
@@ -85,7 +79,9 @@ export abstract class Datatype<T> {
             case DatatypeEnum.CHAR:
                 return new CHAR(value ?? '', size, isNull);
             default:
-                throw new Error(`Unsupported datatype: ${datatype}`);
+                throw new DatatypeException(
+                    `Unsupported datatype: ${datatype}`,
+                );
         }
     }
 }
@@ -264,7 +260,7 @@ export class VARCHAR extends Datatype<string> {
     }
     public set value(val: string) {
         if (val.length > this.length) {
-            throw new Error(
+            throw new DatatypeException(
                 `Value length exceeds the specified length of ${this.length} characters for VARCHAR type`,
             );
         }
@@ -305,13 +301,13 @@ export class VARCHAR extends Datatype<string> {
 
     constructor(value: string, length: number, isNull: boolean = false) {
         if (length <= 0) {
-            throw new Error(
+            throw new DatatypeException(
                 `Length must be a positive integer greater than zero`,
             );
         }
 
         if (length > 1018) {
-            throw new Error(
+            throw new DatatypeException(
                 `Length exceeds the maximum allowed length of 1018 characters`,
             );
         }
@@ -324,7 +320,7 @@ export class VARCHAR extends Datatype<string> {
         }
 
         if (value.length > length) {
-            throw new Error(
+            throw new DatatypeException(
                 `Value length exceeds the specified length of ${length} characters for VARCHAR type`,
             );
         }
@@ -446,10 +442,7 @@ export class DATETIME extends Datatype<Date> {
         let dateValue: Date;
         if (val instanceof Date) {
             dateValue = val;
-        } else if (
-            typeof val === 'string' &&
-            /^\d{4}-\d{2}-\d{2}$/.test(val)
-        ) {
+        } else if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
             const [year, month, day] = val.split('-').map(Number);
             dateValue = new Date(year, month - 1, day);
         } else {
@@ -504,7 +497,7 @@ export class CHAR extends Datatype<string> {
     }
     public set value(val: string) {
         if (val.length > this.length) {
-            throw new Error(
+            throw new DatatypeException(
                 `Value length exceeds the specified length of ${this.length}`,
             );
         }
@@ -532,7 +525,7 @@ export class CHAR extends Datatype<string> {
 
     constructor(value: string, length: number, isNull: boolean = false) {
         if (length <= 0) {
-            throw new Error(
+            throw new DatatypeException(
                 `Length must be a positive integer greater than zero`,
             );
         }
@@ -544,7 +537,7 @@ export class CHAR extends Datatype<string> {
             return;
         }
         if (value.length > length) {
-            throw new Error(
+            throw new DatatypeException(
                 `Value length exceeds the specified length of ${length}`,
             );
         }

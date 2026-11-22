@@ -16,6 +16,7 @@ import { ColumnConstraintEnum } from '../parser/ast/ddl/column-definition.ast.js
 import { DropTableAST } from '../parser/ast/ddl/drop-table.ast.js';
 import { UpdateAST } from '../parser/ast/dml/update.ast.js';
 import { SelectAST } from '../parser/ast/select.class.js';
+import { DeleteAST } from '../parser/ast/dml/delete.ast.js';
 
 const mockTableCatalog = [
     new CatalogColumn('id', 0, DatatypeEnum.INT, true, true, false, 0),
@@ -476,8 +477,7 @@ describe('updateValidator', () => {
         const updateValidator = new UpdateValidator(tableManager);
         const ast = {
             tableName: 'test_table',
-        } as unknown as any; // Replace with actual UpdateAST type
-
+        } as unknown as UpdateAST;
         await expect(updateValidator.validate(ast)).rejects.toThrow(
             "Table 'test_table' does not exist",
         );
@@ -624,7 +624,7 @@ describe('DeleteValidator', () => {
         const deleteValidator = new DeleteValidator(tableManager);
         const ast = {
             tableName: 'test_table',
-        } as unknown as any; // Replace with actual DeleteAST type
+        } as unknown as DeleteAST;
 
         await expect(deleteValidator.validate(ast)).rejects.toThrow(
             "Table 'test_table' does not exist",
@@ -639,7 +639,7 @@ describe('DeleteValidator', () => {
         const deleteValidator = new DeleteValidator(tableManager);
         const ast = {
             tableName: 'test_table',
-        } as unknown as any; // Replace with actual DeleteAST type
+        } as unknown as DeleteAST;
 
         await expect(deleteValidator.validate(ast)).resolves.not.toThrow();
         expect(tableManager.isTableExists).toHaveBeenCalledWith('test_table');
@@ -672,7 +672,7 @@ describe('DeleteValidator', () => {
                 rightOperand: 1,
                 isRightOperandColumn: false,
             },
-        } as unknown as any; // Replace with actual DeleteAST type
+        } as unknown as DeleteAST;
 
         await expect(deleteValidator.validate(ast)).rejects.toThrow(
             "Column 'undefined' does not exist in table 'test_table'.",
@@ -706,7 +706,7 @@ describe('DeleteValidator', () => {
                 rightOperand: 1,
                 isRightOperandColumn: false,
             },
-        } as unknown as any; // Replace with actual DeleteAST type
+        } as unknown as DeleteAST;
 
         await expect(deleteValidator.validate(ast)).resolves.not.toThrow();
     });
@@ -733,8 +733,7 @@ describe('DeleteValidator', () => {
         const ast = {
             tableName: 'test_table',
             whereCondition: null,
-        } as unknown as any; // Replace with actual DeleteAST type
-
+        } as unknown as DeleteAST;
         await expect(deleteValidator.validate(ast)).resolves.not.toThrow();
     });
 
@@ -760,7 +759,7 @@ describe('DeleteValidator', () => {
         const ast = {
             tableName: 'test_table',
             whereCondition: null,
-        } as unknown as any; // Replace with actual DeleteAST type
+        } as unknown as DeleteAST;
 
         await expect(deleteValidator.validate(ast)).resolves.not.toThrow();
     });

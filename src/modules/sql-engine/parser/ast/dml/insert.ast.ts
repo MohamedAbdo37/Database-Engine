@@ -23,19 +23,6 @@ export interface InsertRow {
 export class InsertAST extends DML {
     columns: string[] = [];
     rows: InsertRow[] = [];
-    private parser: ParserGenerator;
-
-    private peek(): Token | null {
-        return this.parser.peek();
-    }
-
-    private consume(): Token | null {
-        return this.parser.consume();
-    }
-
-    private expect(token: Token): boolean {
-        return this.parser.expect(token);
-    }
 
     private parseColumnsNames() {
         this.consume();

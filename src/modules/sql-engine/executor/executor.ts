@@ -1,14 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { TableManager } from '../../storage/table-manager/table-manager.js';
 import { DDLType, DMLType, MainClassAST } from '../parser/ast/ast.class.js';
 import { CreateTableAST } from '../parser/ast/ddl/create-table.ast.js';
-import { ExecutionErrorException } from '../exceptions/execution-error.exc.js';
 import { DropTableAST } from '../parser/ast/ddl/drop-table.ast.js';
 import { InsertAST } from '../parser/ast/dml/insert.ast.js';
 import { UpdateAST } from '../parser/ast/dml/update.ast.js';
 import { Table } from '../../storage/table-manager/table.dto.js';
 import { DeleteAST } from '../parser/ast/dml/delete.ast.js';
-import { SelectAST, SelectClause } from '../parser/ast/select.class.js';
+import { SelectAST } from '../parser/ast/select.class.js';
 import { CreateExecutor } from './executors/create.executor.js';
 import { DropExecutor } from './executors/drop.executor.js';
 import { InsertExecutor } from './executors/insert.executor.js';

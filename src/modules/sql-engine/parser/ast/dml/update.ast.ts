@@ -20,7 +20,6 @@ export interface UpdateColumnAssignment {
 }
 
 export class UpdateAST extends DML {
-    private parser: ParserGenerator;
     private _columns: UpdateColumnAssignment[] = [];
 
     private _whereCondition: WhereClauseAST;
@@ -42,38 +41,6 @@ export class UpdateAST extends DML {
 
     constructor() {
         super(DMLType.UPDATE);
-    }
-
-    private peek(): Token | null {
-        if (!this.parser) {
-            throw new Error('Parser is not initialized.');
-        }
-
-        return this.parser.peek();
-    }
-
-    private next(): Token | null {
-        if (!this.parser) {
-            throw new Error('Parser is not initialized.');
-        }
-
-        return this.parser.next();
-    }
-
-    private consume(): Token | null {
-        if (!this.parser) {
-            throw new Error('Parser is not initialized.');
-        }
-
-        return this.parser.consume();
-    }
-
-    private expect(expectedToken: Token): boolean {
-        if (!this.parser) {
-            throw new Error('Parser is not initialized.');
-        }
-
-        return this.parser.expect(expectedToken);
     }
 
     private parseColumnAssignment(): void {

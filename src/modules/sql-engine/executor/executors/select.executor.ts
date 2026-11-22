@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ExecutorIF } from '../executor.js';
-import { OrderDirection, SelectAST } from '../../parser/ast/select.class.js';
+import { SelectAST } from '../../parser/ast/select.class.js';
 import { TableManager } from '../../../storage/table-manager/table-manager.js';
 import { Table } from '../../../storage/table-manager/table.dto.js';
+import { OrderDirection } from '../../parser/ast/ast.class.js';
 
 @Injectable()
 export class SelectExecutor implements ExecutorIF {

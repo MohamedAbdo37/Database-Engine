@@ -13,8 +13,7 @@ import {
     TokenType,
 } from '../../../tokenizer/token.class.js';
 import { ParserGenerator } from '../../parser.js';
-import { AST, SubClassAST } from '../ast.class.js';
-import { FromClause } from '../select.class.js';
+import { FromClause, SubClassAST } from '../ast.class.js';
 
 export class WhereClauseAST extends SubClassAST {
     leftOperand: string | number | null | Column;
@@ -25,7 +24,7 @@ export class WhereClauseAST extends SubClassAST {
     isRightOperandColumn: boolean;
     rightColumnRef?: string;
 
-    private openPrenticesToken: Token[];
+    private openParenthesesToken: Token[];
 
     constructor() {
         super();
@@ -34,7 +33,7 @@ export class WhereClauseAST extends SubClassAST {
         this.operator = WhereOperator.EQUALS;
         this.rightOperand = null;
         this.isRightOperandColumn = false;
-        this.openPrenticesToken = [];
+        this.openParenthesesToken = [];
     }
 
     public static validateWhereOperandAsColumn(
@@ -79,7 +78,7 @@ export class WhereClauseAST extends SubClassAST {
         from?: FromClause[],
     ): WhereClauseAST | null {
         while (parser.expect(new PunctuationToken('('))) {
-            this.openPrenticesToken.push(parser.peek()!);
+            this.openParenthesesToken.push(parser.peek()!);
             parser.consume(); // Consume the '(' token
         }
 
@@ -151,13 +150,13 @@ export class WhereClauseAST extends SubClassAST {
                 parser.consume(); // Consume the 'NULL' token
 
                 while (parser.expect(new PunctuationToken(')'))) {
-                    if (this.openPrenticesToken.length === 0) {
+                    if (this.openParenthesesToken.length === 0) {
                         const foundToken = parser.peek();
                         throw new SyntaxErrorException(
                             `Detected a closing parenthesis ')' at ${foundToken?.position} without a corresponding opening parenthesis '('.`,
                         );
                     }
-                    this.openPrenticesToken.pop();
+                    this.openParenthesesToken.pop();
                     parser.consume(); // Consume the ')' token
                 }
 
@@ -179,20 +178,20 @@ export class WhereClauseAST extends SubClassAST {
         this.rightColumnRef = rightOperandInfo.columnRef;
 
         while (parser.expect(new PunctuationToken(')'))) {
-            if (this.openPrenticesToken.length === 0) {
+            if (this.openParenthesesToken.length === 0) {
                 const foundToken = parser.peek();
                 throw new SyntaxErrorException(
                     `Detected a closing parenthesis ')' at ${foundToken?.position} without a corresponding opening parenthesis '('.`,
                 );
             }
-            this.openPrenticesToken.pop();
+            this.openParenthesesToken.pop();
             parser.consume(); // Consume the ')' token
         }
 
-        if (this.openPrenticesToken.length > 0) {
+        if (this.openParenthesesToken.length > 0) {
             if (!parser.expect(new PunctuationToken(')'))) {
                 throw new SyntaxErrorException(
-                    `Detected an opening parenthesis '(' at ${this.openPrenticesToken[0].position} but no corresponding closing parenthesis ')' was found.`,
+                    `Detected an opening parenthesis '(' at ${this.openParenthesesToken[0].position} but no corresponding closing parenthesis ')' was found.`,
                 );
             }
         }
@@ -219,7 +218,7 @@ export class WhereClauseAST extends SubClassAST {
             columnRef: undefined,
         };
         while (parser.expect(new PunctuationToken('('))) {
-            this.openPrenticesToken.push(parser.peek()!);
+            this.openParenthesesToken.push(parser.peek()!);
             parser.consume(); // Consume the '(' token
         }
 
@@ -263,7 +262,7 @@ export class WhereClauseAST extends SubClassAST {
                 token.type !== TokenType.KEYWORD)
         ) {
             this.missedTokenError(
-                'left_operand',
+                isLeftOperand ? 'left_operand' : 'right_operand',
                 token ? token.value : null,
                 token ? token.position : null,
                 'WHERE',
@@ -299,13 +298,13 @@ export class WhereClauseAST extends SubClassAST {
         parser.consume(); // Consume operand token
 
         while (parser.expect(new PunctuationToken(')'))) {
-            if (this.openPrenticesToken.length === 0) {
+            if (this.openParenthesesToken.length === 0) {
                 const foundToken = parser.peek();
                 throw new SyntaxErrorException(
                     `Detected a closing parenthesis ')' at ${foundToken?.position} without a corresponding opening parenthesis '('.`,
                 );
             }
-            this.openPrenticesToken.pop();
+            this.openParenthesesToken.pop();
             parser.consume(); // Consume the ')' token
         }
 

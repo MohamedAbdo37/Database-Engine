@@ -1,43 +1,22 @@
-import { Catalog } from '../../../storage/dto/catalog.dto.js';
-import { WhereOperator } from '../../../storage/table-manager/table-manager.js';
 import { SyntaxErrorException } from '../../exceptions/syntax-error.exc.js';
 import {
     KeywordToken,
-    MultiCharacterOperatorToken,
     PunctuationToken,
     SingleCharacterOperatorToken,
-    Token,
     TokenType,
 } from '../../tokenizer/token.class.js';
 import { ParserGenerator } from '../parser.js';
-import { AST, DMLType, MainClassAST } from './ast.class.js';
+import {
+    DMLType,
+    FromClause,
+    MainClassAST,
+    OrderByClause,
+    OrderDirection,
+    SelectClause,
+} from './ast.class.js';
 import { WhereClauseAST } from './dml/where-clause.ast.js';
 
-export enum OrderDirection {
-    ASC = 'ASC',
-    DESC = 'DESC',
-}
-
-export interface FromClause {
-    tableName: string;
-    alias?: string;
-    schema?: Catalog;
-}
-
-export interface SelectClause {
-    name: string;
-    as?: string;
-    from?: string;
-    tableName?: string;
-}
-
-export interface OrderByClause {
-    column: SelectClause;
-    direction: OrderDirection;
-}
-
 export class SelectAST extends MainClassAST {
-    private parser: ParserGenerator;
     private _from: FromClause[];
     private _selectColumns: SelectClause[] | `*`;
     private _whereClause: WhereClauseAST;
@@ -75,22 +54,6 @@ export class SelectAST extends MainClassAST {
         this._limit = value;
     }
 
-    private peek(): Token | null {
-        return this.parser.peek();
-    }
-
-    private next(): Token | null {
-        return this.parser.next();
-    }
-
-    private consume(): Token | null {
-        return this.parser.consume();
-    }
-
-    private expect(expectedToken: Token): boolean {
-        return this.parser.expect(expectedToken);
-    }
-
     constructor() {
         super(DMLType.SELECT);
     }
@@ -106,34 +69,6 @@ export class SelectAST extends MainClassAST {
                 return as ? `${columnName} AS ${as}` : columnName;
             })
             .join(', ');
-    }
-
-    private isColumnExists(column: SelectClause, position: string): void {
-        if (this.selectColumns === '*') {
-            throw new Error(
-                'Cannot check for column existence when selectColumns is set to "*".',
-            );
-        }
-
-        const columnExists = this.selectColumns.find(
-            (col) => col.name === column.name,
-        );
-
-        if (!columnExists) {
-            return;
-        }
-
-        if (!column.from) {
-            throw new SyntaxErrorException(
-                `Ambiguous column reference '${column.name}' at ${position}. The column exists in multiple tables, but no table alias or name was provided to disambiguate it.`,
-            );
-        }
-
-        if (column.from === columnExists.from) {
-            throw new SyntaxErrorException(
-                `Duplicate column reference '${column.name}' from table '${column.from}' at ${position}. The same column is being selected multiple times.`,
-            );
-        }
     }
 
     private parseSelectColumns(): void {
@@ -180,7 +115,6 @@ export class SelectAST extends MainClassAST {
             );
         }
 
-        this.isColumnExists(column, columnNameToken.position);
         column.name = this.consume()!.value;
 
         if (this.expect(new KeywordToken('AS'))) {
