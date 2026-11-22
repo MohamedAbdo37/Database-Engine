@@ -1,5 +1,6 @@
 import {
     mkdir,
+    appendFile,
     readdir,
     readFile,
     rmdir,
@@ -19,9 +20,9 @@ import {
 import { DirectoryPage, Page, PAGE_SIZE, TablePage } from '../dto/page.dto.js';
 import { PageType } from '../dto/page-type.dto.js';
 import { Injectable } from '@nestjs/common';
+import { dirname } from 'path';
 
-const getDataFolder = (): string =>
-    process.env.DB_DATA_FOLDER ?? './src/data';
+const getDataFolder = (): string => process.env.DB_DATA_FOLDER ?? './src/data';
 
 @Injectable()
 export class FileManager {
@@ -57,11 +58,36 @@ export class FileManager {
             this.createFolder(`${DATA_FOLDER}/catalog`),
             this.createFolder(`${DATA_FOLDER}/table`),
             this.createFolder(`${DATA_FOLDER}/index`),
+            mkdir(dirname(`${DATA_FOLDER}/db.log`), { recursive: true })
+                .then(() =>
+                    console.log(
+                        `Log file ${DATA_FOLDER}/db.log created successfully.`,
+                    ),
+                )
+                .catch((error: IOException) => {
+                    throw new IOException(
+                        `Failed to create log file ${DATA_FOLDER}/db.log: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                }),
         ]);
     }
 
     public isFileOpen(): boolean {
         return this.fileDescriptor !== null;
+    }
+
+    public async appendToLogFile(logMessage: string): Promise<void> {
+        const logFilePath = `${getDataFolder()}/db.log`;
+
+        try {
+            await appendFile(logFilePath, `${logMessage}\n`, {
+                encoding: 'utf8',
+            });
+        } catch (error) {
+            throw new IOException(
+                `Failed to append to log file ${logFilePath}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     public async createTableDateFile(tableName: string): Promise<void> {

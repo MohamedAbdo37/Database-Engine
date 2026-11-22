@@ -5,6 +5,7 @@ import { Executor } from './executor/executor.js';
 import { DDLType, DMLType, MainClassAST } from './parser/ast/ast.class.js';
 import { Validator } from './validator/validator.js';
 import { Table } from '../storage/table-manager/table.dto.js';
+import { Logger } from '../storage/logger/logger.js';
 
 @Injectable()
 export class SqlEngineService {
@@ -12,53 +13,66 @@ export class SqlEngineService {
         private readonly tokenizer: Tokenizer,
         private readonly executor: Executor,
         private readonly validator: Validator,
+        private readonly logger: Logger,
     ) {}
 
     async executeDDL(query: string): Promise<string> {
-        const tokens = this.tokenizer.tokenize(query);
+        let result: string = '';
 
-        const ast = new ParserGenerator(tokens).parse() as MainClassAST;
+        try {
+            const tokens = this.tokenizer.tokenize(query);
 
-        if (!Object.values(DDLType).includes(ast.type as DDLType)) {
-            throw new BadRequestException(
-                `Expected DDL AST, but got ${ast.type}`,
-            );
+            const ast = new ParserGenerator(tokens).parse() as MainClassAST;
+
+            if (!Object.values(DDLType).includes(ast.type as DDLType)) {
+                throw new BadRequestException(
+                    `Expected DDL AST, but got ${ast.type}`,
+                );
+            }
+
+            await this.validator.validate(ast as MainClassAST);
+
+            result = (await this.executor.execute(
+                ast as MainClassAST,
+            )) as string;
+        } catch (error) {
+            await this.logger.logErrorDDL(query, error as Error);
+            throw error;
         }
 
-        await this.validator.validate(ast as MainClassAST);
-
-        let result = (await this.executor.execute(
-            ast as MainClassAST,
-        )) as string;
-
         console.log(`Executed DDL query: \n${query} \nsuccessfully.`);
-
+        await this.logger.logSuccessDDL(query);
         return result;
     }
 
     async executeDML(
         query: string,
     ): Promise<string | Record<string, unknown>[]> {
-        const tokens = this.tokenizer.tokenize(query);
-        const ast = new ParserGenerator(tokens).parse() as MainClassAST;
+        let result: Table | string = '';
+        try {
+            const tokens = this.tokenizer.tokenize(query);
+            const ast = new ParserGenerator(tokens).parse() as MainClassAST;
 
-        if (!Object.values(DMLType).includes(ast.type as DMLType)) {
-            throw new BadRequestException(
-                `Expected DML AST, but got ${ast.type}`,
-            );
+            if (!Object.values(DMLType).includes(ast.type as DMLType)) {
+                throw new BadRequestException(
+                    `Expected DML AST, but got ${ast.type}`,
+                );
+            }
+
+            await this.validator.validate(ast as MainClassAST);
+            result = await this.executor.execute(ast as MainClassAST);
+        } catch (error) {
+            await this.logger.logErrorDML(query, error as Error);
+            throw error;
         }
 
-        await this.validator.validate(ast as MainClassAST);
-        const result: Table | string = await this.executor.execute(
-            ast as MainClassAST,
-        );
-
         console.log(`Executed DML query: \n${query} \nsuccessfully.`);
+
+        await this.logger.logSuccessDML(query);
 
         if (result instanceof Table) {
             return Table.mapTableToRows(result);
         }
-
         return result;
     }
 }

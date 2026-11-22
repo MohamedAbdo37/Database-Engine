@@ -11,17 +11,4 @@ export class StorageService implements OnModuleInit {
             'StorageService initialized and data folder structure is ready.',
         );
     }
-
-    async createTable() {}
-    async dropTable() {}
-
-    async insertData() {}
-    async updateData() {}
-    async deleteData() {}
-    async getById() {}
-    async scanData() {}
-
-    async createIndex() {}
-    async dropIndex() {}
-    async lookupIndex() {}
 }

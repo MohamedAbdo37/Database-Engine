@@ -6,6 +6,7 @@ import { RecordManager } from './record-manager/record-manager.js';
 import { IndexManager } from './index-manager/index-manager.js';
 import { CatalogManager } from './catalog-manager/catalog-manager.js';
 import { TableManager } from './table-manager/table-manager.js';
+import { Logger } from './logger/logger.js';
 
 @Global()
 @Module({
@@ -17,13 +18,8 @@ import { TableManager } from './table-manager/table-manager.js';
         IndexManager,
         CatalogManager,
         TableManager,
+        Logger,
     ],
-    exports: [
-        StorageService,
-        IndexManager,
-        CatalogManager,
-        TableManager,
-        RecordManager,
-    ],
+    exports: [StorageService, FileManager, TableManager, Logger],
 })
 export class StorageModule {}

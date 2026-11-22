@@ -17,7 +17,6 @@ import { InsertExecutor } from './executor/executors/insert.executor.js';
 import { UpdateExecutor } from './executor/executors/update.executor.js';
 import { DeleteExecutor } from './executor/executors/delete.executor.js';
 import { SelectExecutor } from './executor/executors/select.executor.js';
-
 @Module({
     imports: [StorageModule],
     providers: [
